@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["week", "documents"],
+  "properties": {
+    "week": { "type": "string" },
+    "documents": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["filename", "date", "rows"],
+        "properties": {
+          "filename": { "type": "string" },
+          "date": { "type": "string" },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["rawEmployeeName", "employeeName", "startTime", "finishTime", "breakMinutes", "reviewRequired", "uncertainFields", "reviewReason"],
+              "properties": {
+                "rawEmployeeName": { "type": ["string", "null"] },
+                "employeeName": { "type": ["string", "null"] },
+                "startTime": { "type": ["string", "null"] },
+                "finishTime": { "type": ["string", "null"] },
+                "breakMinutes": { "type": ["integer", "null"] },
+                "reviewRequired": { "type": "boolean" },
+                "uncertainFields": { "type": "array", "items": { "type": "string" } },
+                "reviewReason": { "type": ["string", "null"] }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

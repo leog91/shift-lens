@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["week", "employees"],
+  "properties": {
+    "week": { "type": "string" },
+    "employees": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["employeeName", "ordinaryPaidMinutes", "sundayPaidMinutes", "otherPaidMinutes", "totalPaidMinutes", "reviewRequired", "reviewReason"],
+        "properties": {
+          "employeeName": { "type": ["string", "null"] },
+          "ordinaryPaidMinutes": { "type": ["integer", "null"] },
+          "sundayPaidMinutes": { "type": ["integer", "null"] },
+          "otherPaidMinutes": { "type": ["integer", "null"] },
+          "totalPaidMinutes": { "type": ["integer", "null"] },
+          "reviewRequired": { "type": "boolean" },
+          "reviewReason": { "type": ["string", "null"] }
+        }
+      }
+    }
+  }
+}

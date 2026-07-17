@@ -1,0 +1,4 @@
+export default function ExtractionSettingsPage() {
+  const openAiEnabled = Boolean(process.env.OPENAI_API_KEY && process.env.OPENAI_VISION_MODEL);
+  return <section className="space-y-4"><h1 className="text-3xl font-bold">Extraction settings</h1><div className="grid gap-4 rounded border bg-white p-4"><label className="grid gap-1">OCR service URL<input className="rounded border p-2" defaultValue="http://127.0.0.1:8001" /></label><label className="grid gap-1">Default provider<select className="rounded border p-2"><option>Paddle OCR</option><option>Manual</option>{openAiEnabled ? <option>OpenAI Vision</option> : null}</select></label><p>OpenAI Vision status: {openAiEnabled ? "configured" : "disabled until OPENAI_API_KEY and OPENAI_VISION_MODEL are set"}</p><label className="grid gap-1">Maximum expected shift duration<input className="rounded border p-2" defaultValue="16h" /></label></div></section>;
+}
