@@ -3,6 +3,7 @@ import { ActualWeekClient } from "@/components/ActualWeekClient";
 import { WeekCoverage } from "@/components/WeekCoverage";
 import { BatchExtractionButton } from "@/components/BatchExtractionButton";
 import { isLocalDataMode } from "@/lib/data-mode";
+import { ManualShiftForm } from "@/components/ManualShiftForm";
 
 export default async function ActualPage({ params }: { params: Promise<{ weekId: string }> }) {
   const { weekId } = await params;
@@ -24,6 +25,7 @@ export default async function ActualPage({ params }: { params: Promise<{ weekId:
       </div>
       <WeekCoverage week={week} />
       {readOnly ? <div className="demo-notice" role="note"><strong>Demo account</strong><span>Document processing and edits are disabled. These fictional records show how local processing looks.</span></div> : <BatchExtractionButton dailySheetCount={dailyDocumentStates.length} reviewOnlyDocuments={reviewOnlyDocuments} unprocessedDocuments={unprocessedDocuments} weekId={weekId} />}
+      {!readOnly ? <ManualShiftForm employees={employees} weekId={week.id} weekStarting={week.weekStarting} /> : null}
       <ActualWeekClient readOnly={readOnly} weekId={week.id} documents={documents} shifts={shifts} employees={employees} />
     </section>
   );

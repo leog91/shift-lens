@@ -1,4 +1,6 @@
 import { getWeeks } from "@/lib/week-data";
+import { isLocalDataMode } from "@/lib/data-mode";
+import { CreateManualWeekForm } from "@/components/WeekListClient";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +21,7 @@ export default function WeeksPage() {
         <h1>Weeks</h1>
         <p>Choose a week to review its source documents, confirmed actual hours, and comparison.</p>
       </div>
+      <CreateManualWeekForm readOnly={!isLocalDataMode()} />
       <div className="weeks-list">
         {weeks.length === 0 ? <div className="empty-state">No local week loaded.</div> : null}
         {weeks.map((week) => (

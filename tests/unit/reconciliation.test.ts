@@ -29,6 +29,7 @@ describe("reconciliation domain", () => {
     expect(result.paidSundayMinutes).toBe(240);
   });
   test("uncertain shift excluded from confirmed totals", () => expect(compareActualAndPaid([shift({ status: "uncertain" })], [payroll({})])[0].actualTotalMinutes).toBe(0));
+  test("manually entered shift is included in confirmed totals", () => expect(compareActualAndPaid([shift({ status: "manually_entered", breakMinutes: 30 })], [payroll({ ordinaryPaidMinutes: 450, displayedTotalPaidMinutes: 450 })])[0]).toMatchObject({ actualTotalMinutes: 450, status: "matches" }));
   test("exact actual-versus-paid match", () => expect(compareActualAndPaid([shift({})], [payroll({})])[0].status).toBe("matches"));
   test("actual greater than paid", () => expect(compareActualAndPaid([shift({})], [payroll({ displayedTotalPaidMinutes: 420, ordinaryPaidMinutes: 420 })])[0].status).toBe("possible_missing_hours"));
   test("paid greater than actual", () => expect(compareActualAndPaid([shift({})], [payroll({ displayedTotalPaidMinutes: 540, ordinaryPaidMinutes: 540 })])[0].status).toBe("possible_extra_paid_hours"));

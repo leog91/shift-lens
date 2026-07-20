@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import Database from "better-sqlite3";
@@ -283,6 +284,28 @@ export function writeLocalWeek(week: LocalWeek) {
     migrateSnapshots(database);
     const company = companyId(database);
     database.transaction(() => writeWeek(database, company, week))();
+  } finally {
+    database.close();
+  }
+}
+
+export function createLocalEmployee(displayName: string, aliases: string[]) {
+  const database = openDatabase();
+  try {
+    migrateLegacyJson(database);
+    migrateSnapshots(database);
+    const company = companyId(database);
+    const name = displayName.trim();
+    const existing = database.prepare("SELECT id FROM local_employees WHERE company_id = ? AND lower(display_name) = lower(?)").get(company, name) as { id: string } | undefined;
+    if (existing) throw new Error("An employee with this name already exists.");
+    const id = `employee-${randomUUID()}`;
+    const insert = database.transaction(() => {
+      database.prepare("INSERT INTO local_employees (id, company_id, display_name, active) VALUES (?, ?, ?, 1)").run(id, company, name);
+      const alias = database.prepare("INSERT OR IGNORE INTO local_employee_aliases (employee_id, alias) VALUES (?, ?)");
+      for (const value of aliases) alias.run(id, value);
+    });
+    insert();
+    return { id, displayName: name, aliases };
   } finally {
     database.close();
   }
