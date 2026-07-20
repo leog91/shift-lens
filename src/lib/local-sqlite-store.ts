@@ -16,6 +16,17 @@ export function localDatabasePath() {
   return localProfilePath("data", "shiftlens.sqlite");
 }
 
+export async function backupLocalDatabase(destinationPath: string) {
+  const database = openDatabase();
+  try {
+    migrateLegacyJson(database);
+    migrateSnapshots(database);
+    await database.backup(destinationPath);
+  } finally {
+    database.close();
+  }
+}
+
 function openDatabase(path = localDatabasePath()) {
   mkdirSync(dirname(path), { recursive: true });
   const database = new Database(path);

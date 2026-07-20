@@ -140,6 +140,20 @@ The deployed demo is safe to share because it has no real profiles, no persisted
 
 Local profiles created with `profile:init` have no `profile.json`. Their `data/shiftlens.sqlite` database contains the company ID, business name, schema version, settings, and all local week data. Existing JSON profiles are imported automatically into SQLite on their first local-mode read; the JSON files are retained as an untouched backup.
 
+Use `/backups` in local mode to create or restore profile snapshots. A snapshot includes the complete `data/` folder, all `photo-inbox/` originals, and legacy `profile.json` metadata when present, with a checksum manifest. This covers all ShiftLens business data: employees, shifts, payroll entries, documents, reviews, settings, and original photos. Restores verify every file and create a pre-restore safety copy first. Snapshots do not include the application source, dependencies, or environment secrets such as `.env` files. Backups default to a sibling `shiftlens-backups/<profile-name>/` directory; set `SHIFT_LENS_BACKUP_DIR` to use another local location. Keep backup storage outside Git and include it in your normal encrypted/off-device backup routine.
+
+Each backup is a timestamped directory. Copy the entire directory when moving it to encrypted or off-device storage; do not copy individual files from inside it:
+
+```text
+shiftlens-backups/
+  restaurant-a/
+    2026-07-20T18-51-58-123Z-<id>/
+      data/
+      photo-inbox/
+      profile.json     # present only for legacy profiles
+      manifest.json
+```
+
 Never infer the mode from whether a profile directory exists. Keeping local mode explicit prevents an accidental deployment from exposing a local profile.
 
 ## Deploying The Demo

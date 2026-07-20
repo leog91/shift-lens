@@ -22,6 +22,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/analytics">Analytics</Link>
               <Link href="/photos">Photos</Link>
               <Link href="/employees">Employees</Link>
+              <Link href="/backups">Backups</Link>
               <Link href="/settings/extraction">Extraction</Link>
             </nav>
           </div>
