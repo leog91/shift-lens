@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="1260" viewBox="0 0 960 1260">
+  <rect width="960" height="1260" fill="#e7e5e4"/><rect x="72" y="56" width="816" height="1148" rx="8" fill="#fff" stroke="#a8a29e" stroke-width="3"/>
+  <text x="120" y="130" fill="#1c1917" font-family="Arial, sans-serif" font-size="40" font-weight="700">Harbour Bistro</text><text x="120" y="177" fill="#57534e" font-family="Arial, sans-serif" font-size="26">Roster · Week of 6 July 2026</text>
+  <g fill="#44403c" font-family="Arial, sans-serif" font-size="22" font-weight="700"><text x="130" y="260">Employee</text><text x="400" y="260">Mon</text><text x="530" y="260">Tue</text><text x="660" y="260">Wed</text></g>
+  <g stroke="#d6d3d1" stroke-width="2"><path d="M120 280H840M120 380H840M120 480H840M120 580H840M360 230V580M490 230V580M620 230V580M750 230V580"/></g>
+  <g fill="#1c1917" font-family="Arial, sans-serif" font-size="23"><text x="132" y="340">Alex Example</text><text x="400" y="340">09:00–17:00</text><text x="132" y="440">Casey Sample</text><text x="400" y="440">12:00–20:00</text><text x="132" y="540">Jordan Fiction</text><text x="400" y="540">14:00–22:00</text></g>
+  <text x="120" y="1130" fill="#78716c" font-family="Arial, sans-serif" font-size="20">Fictional roster context only. It does not establish actual worked time.</text>
+</svg>

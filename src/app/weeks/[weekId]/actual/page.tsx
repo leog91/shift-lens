@@ -2,6 +2,7 @@ import { getWeekData } from "@/lib/week-data";
 import { ActualWeekClient } from "@/components/ActualWeekClient";
 import { WeekCoverage } from "@/components/WeekCoverage";
 import { BatchExtractionButton } from "@/components/BatchExtractionButton";
+import { isLocalDataMode } from "@/lib/data-mode";
 
 export default async function ActualPage({ params }: { params: Promise<{ weekId: string }> }) {
   const { weekId } = await params;
@@ -14,6 +15,7 @@ export default async function ActualPage({ params }: { params: Promise<{ weekId:
   }));
   const unprocessedDocuments = dailyDocumentStates.filter(({ shifts: documentShifts }) => documentShifts.length === 0).length;
   const reviewOnlyDocuments = dailyDocumentStates.filter(({ shifts: documentShifts }) => documentShifts.length > 0 && documentShifts.every((shift) => shift.id.startsWith("ocr-") && shift.status === "uncertain")).length;
+  const readOnly = !isLocalDataMode();
   return (
     <section className="space-y-6">
       <div>
@@ -21,8 +23,8 @@ export default async function ActualPage({ params }: { params: Promise<{ weekId:
         <p className="text-stone-600">Compare each paper photo with what the app currently understands. Review rows are excluded from confirmed totals.</p>
       </div>
       <WeekCoverage week={week} />
-      <BatchExtractionButton dailySheetCount={dailyDocumentStates.length} reviewOnlyDocuments={reviewOnlyDocuments} unprocessedDocuments={unprocessedDocuments} weekId={weekId} />
-      <ActualWeekClient weekId={week.id} documents={documents} shifts={shifts} employees={employees} />
+      {readOnly ? <div className="demo-notice" role="note"><strong>Demo account</strong><span>Document processing and edits are disabled. These fictional records show how local processing looks.</span></div> : <BatchExtractionButton dailySheetCount={dailyDocumentStates.length} reviewOnlyDocuments={reviewOnlyDocuments} unprocessedDocuments={unprocessedDocuments} weekId={weekId} />}
+      <ActualWeekClient readOnly={readOnly} weekId={week.id} documents={documents} shifts={shifts} employees={employees} />
     </section>
   );
 }

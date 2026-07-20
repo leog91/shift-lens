@@ -57,6 +57,8 @@ input[type="submit"]:not(:disabled) {
 .dashboard-action:hover { border-color: #a8a29e; box-shadow: 0 2px 5px rgb(28 25 23 / 8%); color: #1c1917; }
 .dashboard-action strong { font-size: 0.95rem; }
 .dashboard-action span { color: #78716c; font-size: 0.8125rem; }
+.demo-notice { display: flex; align-items: baseline; gap: 0.6rem; border: 1px solid #fde68a; border-radius: 0.625rem; background: #fffbeb; color: #78350f; padding: 0.75rem 1rem; font-size: 0.875rem; }
+.demo-notice strong { flex: none; }
 
 .week-navigation { display: grid; gap: 0.7rem; margin-bottom: 1.5rem; }
 .week-navigation-top { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }

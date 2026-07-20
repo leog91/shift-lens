@@ -22,7 +22,7 @@ ShiftLens is not a payroll, tax, employment-law, salary, premium, overtime, or e
 ## Architecture
 
 - Next.js App Router is the main product.
-- SQLite stores local data through Drizzle ORM.
+- SQLite stores local data through Drizzle ORM. The public demo uses a separate in-memory SQLite database seeded only with committed fictional records.
 - Deterministic TypeScript functions under `src/domain/reconciliation/` do all calculations.
 - FastAPI under `ocr-service/` is a local OCR companion.
 - OCR providers are isolated behind `DocumentExtractor` adapters: `PaddleOcrExtractor`, `ManualExtractor`, and an optional structured `OpenAiVisionExtractor`.
@@ -132,9 +132,11 @@ Do not copy or share a profile directory through Git. It contains personal emplo
 
 ## Data Modes
 
-- `demo` is selected with `bun run demo`. It loads only tracked fictional records from `src/demo-data/`. Local photos, OCR, and edits are disabled.
+- `demo` is selected with `bun run demo`. It loads only tracked fictional records from `src/demo/` into a read-only in-memory SQLite database. Bundled fictional documents are viewable, but uploads, edits, local photos, and OCR are disabled.
 - `local` is selected with `bun run`. It loads the ignored profile JSON, SQLite file, and photo inbox for private processing, with local OCR.
 - A future hosted database mode should be a separate, authenticated deployment with a separate database from the demo.
+
+The deployed demo is safe to share because it has no real profiles, no persisted user edits, and no image-processing service. Real employee and document processing remains in local mode. A future hosted editing product should use authentication and company-scoped storage; it must remain separate from both the demo database and local profile files.
 
 Never infer the mode from whether a profile directory exists. Keeping local mode explicit prevents an accidental deployment from exposing a local profile.
 

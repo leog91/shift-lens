@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 
 test("workflow 1 opens a fictional week and sees review status", async ({ page }) => {
   await page.goto("/weeks");
-  await expect(page.getByText("Demo workspace: all records are fictional and changes are disabled.")).toBeVisible();
+  await expect(page.getByText("Demo account: all records and documents are fictional. Editing and local file processing are disabled.")).toBeVisible();
   await expect(page.getByText("Week starting 2026-06-29")).toBeVisible();
   await page.goto("/weeks/demo-week-28/comparison");
   await expect(page.getByText("needs_review").first()).toBeVisible();
@@ -18,7 +18,9 @@ test("workflow 2 demo payroll shows paid total", async ({ page }) => {
 
 test("workflow 3 fictional documents are listed without local photos", async ({ page }) => {
   await page.goto("/weeks/demo-week-28/documents");
-  await expect(page.getByText("demo-weekly-payslip.png")).toBeVisible();
+  await expect(page.getByText("demo-weekly-payslip.svg")).toBeVisible();
+  await expect(page.getByAltText("demo-weekly-payslip.svg")).toBeVisible();
+  await expect(page.getByText("Uploading and processing documents is disabled.")).toBeVisible();
 });
 
 test("workflow 4 confirmed hours can be shown as a weekly summary", async ({ page }) => {
@@ -49,7 +51,7 @@ test("employee history shows confirmed hours across loaded weeks", async ({ page
   await page.goto("/employees/employee-alex-example");
   await expect(page.getByRole("heading", { name: "Alex Example" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Hours by week" })).toBeVisible();
-  await expect(page.getByText("2 recorded weeks")).toBeVisible();
+  await expect(page.getByText("4 recorded weeks")).toBeVisible();
 });
 
 test("clicking a row name updates its source-row zoom", async ({ page }) => {

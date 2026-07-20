@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="1260" viewBox="0 0 960 1260">
+  <rect width="960" height="1260" fill="#e7e5e4"/><rect x="72" y="56" width="816" height="1148" rx="8" fill="#fff" stroke="#a8a29e" stroke-width="3"/>
+  <text x="120" y="130" fill="#1c1917" font-family="Arial, sans-serif" font-size="40" font-weight="700">Harbour Bistro</text><text x="120" y="177" fill="#57534e" font-family="Arial, sans-serif" font-size="26">Weekly paid-hours summary · 6–12 July 2026</text>
+  <g fill="#44403c" font-family="Arial, sans-serif" font-size="22" font-weight="700"><text x="130" y="270">Employee</text><text x="500" y="270">Ordinary</text><text x="700" y="270">Total</text></g>
+  <g stroke="#d6d3d1" stroke-width="2"><path d="M120 294H840M120 390H840M120 486H840M120 582H840"/></g>
+  <g fill="#1c1917" font-family="Arial, sans-serif" font-size="26"><text x="132" y="350">Alex Example</text><text x="512" y="350">7h 00m</text><text x="712" y="350">7h 00m</text><text x="132" y="446">Casey Sample</text><text x="512" y="446">7h 30m</text><text x="712" y="446">7h 30m</text><text x="132" y="542">Jordan Fiction</text><text x="512" y="542">Review</text><text x="712" y="542">Review</text></g>
+  <text x="120" y="1130" fill="#78716c" font-family="Arial, sans-serif" font-size="20">Fictional sample for the ShiftLens demo. Not a payslip.</text>
+</svg>

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="1260" viewBox="0 0 960 1260">
+  <rect width="960" height="1260" fill="#e7e5e4"/>
+  <rect x="72" y="56" width="816" height="1148" rx="8" fill="#fffdf7" stroke="#a8a29e" stroke-width="3"/>
+  <text x="120" y="130" fill="#1c1917" font-family="Arial, sans-serif" font-size="40" font-weight="700">Harbour Bistro</text>
+  <text x="120" y="177" fill="#57534e" font-family="Arial, sans-serif" font-size="26">Daily staff sheet · Monday 6 July 2026</text>
+  <line x1="120" y1="220" x2="840" y2="220" stroke="#a8a29e" stroke-width="2"/>
+  <g fill="#44403c" font-family="Arial, sans-serif" font-size="24" font-weight="700"><text x="132" y="270">Name</text><text x="396" y="270">Start</text><text x="548" y="270">Finish</text><text x="706" y="270">Break</text></g>
+  <g stroke="#d6d3d1" stroke-width="2"><line x1="120" y1="294" x2="840" y2="294"/><line x1="120" y1="390" x2="840" y2="390"/><line x1="120" y1="486" x2="840" y2="486"/><line x1="120" y1="582" x2="840" y2="582"/><line x1="120" y1="678" x2="840" y2="678"/></g>
+  <g fill="#1c1917" font-family="cursive" font-size="34"><text x="136" y="350">Alex Example</text><text x="400" y="350">9:00</text><text x="550" y="350">17:00</text><text x="716" y="350">30</text><text x="136" y="446">Casey Sample</text><text x="400" y="446">12:00</text><text x="550" y="446">20:00</text><text x="716" y="446">30</text><text x="136" y="542">Jordan Fiction</text><text x="400" y="542">?</text><text x="550" y="542">22:00</text><text x="716" y="542">30</text></g>
+  <text x="120" y="1130" fill="#78716c" font-family="Arial, sans-serif" font-size="20">Fictional sample for the ShiftLens demo. Not a real workplace record.</text>
+</svg>

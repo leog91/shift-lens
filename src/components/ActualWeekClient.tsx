@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatDuration, workedMinutes, type ShiftInput } from "@/domain/reconciliation";
+import { documentUrl } from "@/lib/document-url";
 
 interface LocalDocument {
   id: string;
@@ -17,7 +18,7 @@ interface EmployeeOption {
   displayName: string;
 }
 
-export function ActualWeekClient({ weekId, documents, shifts, employees }: { weekId: string; documents: LocalDocument[]; shifts: ShiftInput[]; employees: EmployeeOption[] }) {
+export function ActualWeekClient({ weekId, documents, shifts, employees, readOnly = false }: { weekId: string; documents: LocalDocument[]; shifts: ShiftInput[]; employees: EmployeeOption[]; readOnly?: boolean }) {
   const [localShifts, setLocalShifts] = useState(shifts);
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
   const [editing, setEditing] = useState<Record<string, { startTime: string; finishTime: string; breakMinutes: string }>>({});
@@ -147,12 +148,12 @@ export function ActualWeekClient({ weekId, documents, shifts, employees }: { wee
               <p className="break-all text-sm text-stone-600">{document.filename}</p>
               {document.qualityWarnings?.length ? <ul className="list-disc space-y-1 pl-5 text-xs text-amber-800">{document.qualityWarnings.map((warning) => <li key={warning}>{warning}</li>)}</ul> : null}
                <div className="overflow-hidden rounded border bg-stone-100">
-                 <img alt={document.filename} className="max-h-[760px] w-full object-contain" src={`/api/local-photo?path=${encodeURIComponent(document.path)}`} />
+                  <img alt={document.filename} className="max-h-[760px] w-full object-contain" src={documentUrl(document.path)} />
                </div>
                {selectedShift ? <RowMagnifier document={document} rowOrder={employees.map((employee) => employee.displayName)} shift={selectedShift} /> : null}
-               <RescanDocumentButton documentId={document.id} weekId={weekId} />
-               <AddMissingRowForm document={document} existingShifts={allDocumentShifts} employees={employees} weekId={weekId} />
-               <a className="text-sm" href={`/api/local-photo?path=${encodeURIComponent(document.path)}`} target="_blank">Open full document</a>
+                {!readOnly ? <RescanDocumentButton documentId={document.id} weekId={weekId} /> : null}
+                {!readOnly ? <AddMissingRowForm document={document} existingShifts={allDocumentShifts} employees={employees} weekId={weekId} /> : null}
+                <a className="text-sm" href={documentUrl(document.path)} target="_blank">Open full document</a>
             </div>
             <div className="space-y-3">
               <h3 className="font-semibold">App understands these rows</h3>
@@ -187,12 +188,12 @@ export function ActualWeekClient({ weekId, documents, shifts, employees }: { wee
                             <td className="p-2">
                               <div className="flex flex-col gap-2">
                               <span className={shift.status === "confirmed" ? "w-fit rounded bg-green-100 px-2 py-1 text-green-800" : "w-fit rounded bg-amber-100 px-2 py-1 text-amber-900"}>{shift.status === "uncertain" ? "needs checking" : shift.status}</span>
-                              {draft ? (
+                               {!readOnly && draft ? (
                                 <div className="flex flex-wrap gap-2">
                                   <button className="rounded bg-stone-900 px-3 py-1.5 text-xs font-medium text-white" onClick={() => saveEdit(shift)} type="button">Save changes</button>
                                   <button className="rounded border px-3 py-1.5 text-xs" onClick={() => setEditing((current) => { const next = { ...current }; delete next[shift.id]; return next; })} type="button">Cancel</button>
                                 </div>
-                              ) : (
+                               ) : !readOnly ? (
                                 <div className="flex flex-wrap gap-1">
                                   {minutes == null ? (
                                     <button className="rounded bg-amber-700 px-3 py-1.5 text-xs font-medium text-white" onClick={() => startEdit(shift)} type="button">Add missing values</button>
@@ -201,7 +202,7 @@ export function ActualWeekClient({ weekId, documents, shifts, employees }: { wee
                                   ) : null}
                                   <button className="rounded px-2 py-1.5 text-xs text-blue-700 underline-offset-2 hover:underline" onClick={() => startEdit(shift)} type="button">Edit values</button>
                                 </div>
-                              )}
+                               ) : null}
                               {rowErrors[shift.id] ? <p className="text-xs text-red-700">{rowErrors[shift.id]}</p> : null}
                               </div>
                             </td>
@@ -323,7 +324,7 @@ function RowMagnifier({ document, rowOrder, shift }: { document: LocalDocument; 
   const index = rowOrder.findIndex((name) => name === shift.employeeName);
   const rowIndex = index >= 0 ? index : 10;
   const rowCenterPercent = 21 + rowIndex * 3.25;
-  const imageUrl = `/api/local-photo?path=${encodeURIComponent(document.path)}`;
+  const imageUrl = documentUrl(document.path);
   const imageHeight = imageAspectRatio == null ? null : cropWidth * 1.65 * imageAspectRatio;
   const imageTop = imageHeight == null ? 0 : 112 - imageHeight * (rowCenterPercent / 100);
 

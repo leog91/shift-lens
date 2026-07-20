@@ -4,7 +4,7 @@ import type { PayrollInput, ShiftInput } from "@/domain/reconciliation";
 import { missingDailySheetDates } from "./week-coverage";
 import { localProfilePath } from "./local-profile";
 import { isLocalDataMode } from "./data-mode";
-import { demoWeeks } from "@/demo-data/weeks";
+import { getDemoWeeks } from "@/demo/database";
 
 const LocalDocumentSchema = z.object({
   id: z.string(),
@@ -90,7 +90,7 @@ function readExtraWeeks(): LocalWeek[] {
 }
 
 export function getAllWeekData(): LocalWeek[] {
-  if (!isLocalDataMode()) return structuredClone(demoWeeks);
+  if (!isLocalDataMode()) return getDemoWeeks();
   const primary = readPrimaryWeek();
   const extraWeeks = readExtraWeeks();
   if (!primary.weekStarting) return extraWeeks;

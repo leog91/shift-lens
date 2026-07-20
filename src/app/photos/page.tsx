@@ -2,6 +2,7 @@ import { getPhotoLibrary } from "@/lib/photo-library";
 import type { PhotoFile } from "@/lib/photo-library";
 import { getWeekData } from "@/lib/week-data";
 import { assignPhoto, organizePhotos, uploadPhotos } from "./actions";
+import { isLocalDataMode } from "@/lib/data-mode";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,7 @@ export default async function PhotosPage({ searchParams }: { searchParams: Promi
   const manualReview = files.filter((file) => file.folder === "manual-review");
   const assignedToCurrentWeek = files.filter((file) => file.assignedToCurrentWeek);
   const assignedToOtherWeeks = files.filter((file) => file.assignedWeekStarting && !file.assignedToCurrentWeek);
+  const readOnly = !isLocalDataMode();
 
   return (
     <section className="space-y-6">
@@ -36,11 +38,11 @@ export default async function PhotosPage({ searchParams }: { searchParams: Promi
         <div>
           <p className="eyebrow">1. Add</p>
           <h2>Add images</h2>
-          <p>Files are copied to the review queue. JPEG, PNG, and WebP files up to 20 MB are supported.</p>
+          <p>{readOnly ? "Demo accounts can view fictional evidence but cannot upload or process files." : "Files are copied to the review queue. JPEG, PNG, and WebP files up to 20 MB are supported."}</p>
         </div>
         <form action={uploadPhotos} className="flex flex-wrap items-center gap-2">
-          <input accept="image/jpeg,image/png,image/webp" className="max-w-full text-sm" multiple name="photos" required type="file" />
-          <button className="button-primary" type="submit">Add to inbox</button>
+          <input accept="image/jpeg,image/png,image/webp" className="max-w-full text-sm" disabled={readOnly} multiple name="photos" required type="file" />
+          <span title={readOnly ? "Demo account: uploads are disabled." : undefined}><button className="button-primary" disabled={readOnly} type="submit">Add to inbox</button></span>
         </form>
       </section>
 
@@ -61,7 +63,7 @@ export default async function PhotosPage({ searchParams }: { searchParams: Promi
           <p>Assigned files move into their week folder with a clear name. Uncertain files stay in the review queue.</p>
         </div>
         <form action={organizePhotos}>
-          <button className="button-secondary" type="submit">Organize files</button>
+          <span title={readOnly ? "Demo account: organizing files is disabled." : undefined}><button className="button-secondary" disabled={readOnly} type="submit">Organize files</button></span>
         </form>
       </section>
 

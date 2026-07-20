@@ -26,7 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </nav>
           </div>
         </header>
-        {mode === "demo" ? <p className="bg-amber-100 px-4 py-2 text-center text-sm text-amber-950">Demo workspace: all records are fictional and changes are disabled.</p> : null}
+        {mode === "demo" ? <p className="bg-amber-100 px-4 py-2 text-center text-sm text-amber-950">Demo account: all records and documents are fictional. Editing and local file processing are disabled.</p> : null}
         <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
       </body>
     </html>
