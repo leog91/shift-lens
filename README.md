@@ -142,6 +142,18 @@ Local profiles created with `profile:init` have no `profile.json`. Their `data/s
 
 Never infer the mode from whether a profile directory exists. Keeping local mode explicit prevents an accidental deployment from exposing a local profile.
 
+## Deploying The Demo
+
+Deploy only the fictional demo to Vercel. It runs a read-only, in-memory SQLite database that is seeded on each server instance and does not process or persist user files.
+
+- Framework preset: `Next.js`
+- Install command: `bun install --frozen-lockfile`
+- Build command: `bun run build`
+- Environment variable: `SHIFT_LENS_DATA_MODE=demo`
+- Do not configure `SHIFT_LENS_PROFILE_DIR`, `DATABASE_URL`, OCR, or OpenAI variables.
+
+Vercel runs the production Next.js server itself; do not configure `bun run dev` as a start command. `better-sqlite3` is listed in `serverExternalPackages` so the native module remains available to server functions.
+
 ## Phone Photos
 
 Use `/weeks/<weekId>/documents` to preview and validate a local photo before assigning it from `/photos`. The input accepts images and PDFs:
