@@ -103,7 +103,7 @@ See `docs/usage.md` for the practical operator workflow, including photo assignm
 
 ## Business Profiles
 
-ShiftLens can keep each business in a separate local profile. A profile contains its `data/` JSON records, `photo-inbox/` originals, and optional SQLite file, so employee names and documents are never mixed between businesses.
+ShiftLens can keep each business in a separate local profile. A profile contains its SQLite database and `photo-inbox/` originals, so employee names and documents are never mixed between businesses.
 
 Create profiles outside the repository, or under the ignored `profiles/` directory:
 
@@ -133,10 +133,12 @@ Do not copy or share a profile directory through Git. It contains personal emplo
 ## Data Modes
 
 - `demo` is selected with `bun run demo`. It loads only tracked fictional records from `src/demo/` into a read-only in-memory SQLite database. Bundled fictional documents are viewable, but uploads, edits, local photos, and OCR are disabled.
-- `local` is selected with `bun run`. It loads the ignored profile JSON, SQLite file, and photo inbox for private processing, with local OCR.
+- `local` is selected with `bun run`. It loads the ignored profile SQLite database and photo inbox for private processing, with local OCR.
 - A future hosted database mode should be a separate, authenticated deployment with a separate database from the demo.
 
 The deployed demo is safe to share because it has no real profiles, no persisted user edits, and no image-processing service. Real employee and document processing remains in local mode. A future hosted editing product should use authentication and company-scoped storage; it must remain separate from both the demo database and local profile files.
+
+Local profiles created with `profile:init` have no `profile.json`. Their `data/shiftlens.sqlite` database contains the company ID, business name, schema version, settings, and all local week data. Existing JSON profiles are imported automatically into SQLite on their first local-mode read; the JSON files are retained as an untouched backup.
 
 Never infer the mode from whether a profile directory exists. Keeping local mode explicit prevents an accidental deployment from exposing a local profile.
 
@@ -235,7 +237,7 @@ Do not commit real employee names, payslips, daily sheets, uploaded images, extr
 
 The application code can be public while operational data stays local.
 
-- `data/` is ignored: it contains local week JSON, employee names, confirmed hours, payroll values, and `data/local-settings.json` UI preferences.
+- `data/` is ignored: it contains `shiftlens.sqlite`, employee names, confirmed hours, payroll values, and UI preferences.
 - `profiles/` is ignored: it can contain one complete local profile per business.
 - `photo-inbox/` is ignored: uploads wait in `manual-review/` until assigned. The app moves assigned originals into `organized/<week>/` folders with descriptive filenames.
 - `.playwright-mcp/`, OCR previews, databases, and environment files are ignored because they can contain local paths or document-derived data.
@@ -246,7 +248,7 @@ Before the first commit, verify that no private path is staged:
 git init
 git add .
 git status --short
-git check-ignore -v data/local-week.json photo-inbox/organized .playwright-mcp
+git check-ignore -v data/shiftlens.sqlite photo-inbox/organized .playwright-mcp
 ```
 
 `git status --short` must not list `data/`, `photo-inbox/`, `.playwright-mcp/`, `.env*`, or SQLite files. If it does, unstage them with `git restore --staged <path>` and fix `.gitignore` before committing.

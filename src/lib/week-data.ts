@@ -1,10 +1,9 @@
-import { existsSync, readFileSync } from "node:fs";
 import { z } from "zod";
 import type { PayrollInput, ShiftInput } from "@/domain/reconciliation";
 import { missingDailySheetDates } from "./week-coverage";
-import { localProfilePath } from "./local-profile";
 import { isLocalDataMode } from "./data-mode";
 import { getDemoWeeks } from "@/demo/database";
+import { getLocalWeeks } from "./local-sqlite-store";
 
 const LocalDocumentSchema = z.object({
   id: z.string(),
@@ -63,8 +62,6 @@ const LocalWeekSchema = z.object({
 
 export type LocalWeek = z.infer<typeof LocalWeekSchema>;
 
-const LocalWeeksSchema = z.array(LocalWeekSchema);
-
 const emptyWeek: LocalWeek = {
   id: "local-week",
   weekStarting: "",
@@ -77,24 +74,9 @@ const emptyWeek: LocalWeek = {
   reviewItems: []
 };
 
-function readPrimaryWeek(): LocalWeek {
-  const path = localProfilePath("data", "local-week.json");
-  if (!existsSync(path)) return emptyWeek;
-  return LocalWeekSchema.parse(JSON.parse(readFileSync(path, "utf8")));
-}
-
-function readExtraWeeks(): LocalWeek[] {
-  const path = localProfilePath("data", "local-extra-weeks.json");
-  if (!existsSync(path)) return [];
-  return LocalWeeksSchema.parse(JSON.parse(readFileSync(path, "utf8")));
-}
-
 export function getAllWeekData(): LocalWeek[] {
   if (!isLocalDataMode()) return getDemoWeeks();
-  const primary = readPrimaryWeek();
-  const extraWeeks = readExtraWeeks();
-  if (!primary.weekStarting) return extraWeeks;
-  return [primary, ...extraWeeks.filter((week) => week.id !== primary.id)];
+  return getLocalWeeks().map((week) => LocalWeekSchema.parse(week));
 }
 
 export function getWeekData(weekId?: string): LocalWeek {

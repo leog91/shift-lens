@@ -5,6 +5,12 @@ const timestamps = {
   updatedAt: text("updated_at").notNull()
 };
 
+export const companies = sqliteTable("companies", {
+  id: text("id").primaryKey(),
+  businessName: text("business_name").notNull(),
+  schemaVersion: integer("schema_version").notNull().default(1)
+});
+
 export const employees = sqliteTable("employees", {
   id: text("id").primaryKey(),
   displayName: text("display_name").notNull(),
