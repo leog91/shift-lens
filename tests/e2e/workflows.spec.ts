@@ -23,10 +23,19 @@ test("workflow 3 fictional documents are listed without local photos", async ({ 
 
 test("workflow 4 confirmed hours can be shown as a weekly summary", async ({ page }) => {
   await page.goto("/weeks/demo-week-27");
-  await page.getByRole("link", { name: /confirmed hours/i }).click();
+  await page.getByRole("link", { name: "Confirmed hours Show or share the weekly record" }).click();
   await expect(page.getByRole("heading", { name: "Confirmed hours" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Alex Example" })).toBeVisible();
   await expect(page.getByText("Week total").first()).toBeVisible();
+});
+
+test("weekly navigation changes the selected week", async ({ page }) => {
+  await page.goto("/weeks/demo-week-27/comparison");
+  await page.getByRole("link", { name: "Next week" }).click();
+  await expect(page).toHaveURL(/\/weeks\/demo-week-28\/comparison$/);
+  await expect(page.getByText("Week of 2026-07-06")).toBeVisible();
+  await page.getByRole("link", { name: "All weeks" }).click();
+  await expect(page).toHaveURL(/\/weeks$/);
 });
 
 test("workflow 5 photo inbox prioritizes the assignment queue", async ({ page }) => {
