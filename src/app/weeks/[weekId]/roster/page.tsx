@@ -1,9 +1,12 @@
 import { getWeekData } from "@/lib/week-data";
 import { documentUrl } from "@/lib/document-url";
+import { RosterEstimatesClient } from "@/components/RosterEstimatesClient";
+import { isLocalDataMode } from "@/lib/data-mode";
 
 export default async function RosterPage({ params }: { params: Promise<{ weekId: string }> }) {
   const { weekId } = await params;
-  const rosterDocuments = getWeekData(weekId).documents.filter((document) => document.documentType === "roster");
+  const week = getWeekData(weekId);
+  const rosterDocuments = week.documents.filter((document) => document.documentType === "roster");
   return (
     <section className="space-y-4">
       <h1 className="text-3xl font-bold">Roster</h1>
@@ -17,6 +20,7 @@ export default async function RosterPage({ params }: { params: Promise<{ weekId:
         </article>
       ))}
       {rosterDocuments.length === 0 ? <div className="rounded border bg-white p-4 text-stone-600">No roster image loaded.</div> : null}
+      <RosterEstimatesClient assignments={week.rosterAssignments ?? []} employees={week.employees} estimates={week.rosterEstimates ?? []} readOnly={!isLocalDataMode()} rosterDocuments={rosterDocuments.map(({ id, filename }) => ({ id, filename }))} weekId={week.id} weekStarting={week.weekStarting} />
     </section>
   );
 }

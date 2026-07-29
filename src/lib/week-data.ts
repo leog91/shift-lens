@@ -40,6 +40,28 @@ const LocalWeekSchema = z.object({
     status: z.enum(["extracted", "confirmed", "uncertain", "manually_entered"]),
     sourceDocument: z.string().nullable().optional()
   })).default([]),
+  rosterEstimates: z.array(z.object({
+    id: z.string(),
+    employeeId: z.string(),
+    employeeName: z.string(),
+    date: z.string(),
+    startTime: z.string(),
+    finishTime: z.string(),
+    breakMinutes: z.number().int().nonnegative().nullable(),
+    sourceDocument: z.string().nullable(),
+    status: z.enum(["extracted", "confirmed", "manually_entered"]),
+    rawFinishTime: z.string().nullable().default(null),
+    reviewReason: z.string().nullable().default(null)
+  })).optional(),
+  rosterAssignments: z.array(z.object({
+    id: z.string(),
+    employeeId: z.string(),
+    employeeName: z.string(),
+    date: z.string(),
+    type: z.enum(["standby", "office"]),
+    rawValue: z.string(),
+    sourceDocument: z.string()
+  })).optional(),
   payroll: z.array(z.object({
     employeeId: z.string(),
     employeeName: z.string(),
@@ -70,6 +92,8 @@ const emptyWeek: LocalWeek = {
   photoAssignments: [],
   employees: [],
   shifts: [],
+  rosterEstimates: [],
+  rosterAssignments: [],
   payroll: [],
   reviewItems: []
 };

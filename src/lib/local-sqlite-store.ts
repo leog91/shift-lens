@@ -9,6 +9,8 @@ type WeekRow = { id: string; week_starting: string; status: string };
 type EmployeeRow = { id: string; display_name: string; active: number };
 type DocumentRow = { id: string; document_type: LocalWeek["documents"][number]["documentType"]; document_date: string | null; filename: string; path: string; quality_warnings_json: string };
 type ShiftRow = { id: string; employee_id: string; employee_name: string; date: string; start_time: string | null; finish_time: string | null; break_minutes: number | null; status: LocalWeek["shifts"][number]["status"]; source_document: string | null };
+type RosterEstimateRow = { id: string; employee_id: string; employee_name: string; date: string; start_time: string; finish_time: string; break_minutes: number | null; source_document: string | null; status: "extracted" | "confirmed" | "manually_entered"; raw_finish_time: string | null; review_reason: string | null };
+type RosterAssignmentRow = { id: string; employee_id: string; employee_name: string; date: string; type: "standby" | "office"; raw_value: string; source_document: string };
 type PayrollRow = { employee_id: string; employee_name: string; ordinary_paid_minutes: number; sunday_paid_minutes: number; other_paid_minutes: number; displayed_total_paid_minutes: number | null };
 type ReviewRow = LocalWeek["reviewItems"][number];
 
@@ -87,6 +89,30 @@ function openDatabase(path = localDatabasePath()) {
       status TEXT NOT NULL,
       source_document TEXT
     );
+    CREATE TABLE IF NOT EXISTS local_roster_estimates (
+      id TEXT PRIMARY KEY NOT NULL,
+      week_id TEXT NOT NULL,
+      employee_id TEXT NOT NULL,
+      employee_name TEXT NOT NULL,
+      date TEXT NOT NULL,
+      start_time TEXT NOT NULL,
+      finish_time TEXT NOT NULL,
+      break_minutes INTEGER,
+      source_document TEXT,
+      status TEXT NOT NULL,
+      raw_finish_time TEXT,
+      review_reason TEXT
+    );
+    CREATE TABLE IF NOT EXISTS local_roster_assignments (
+      id TEXT PRIMARY KEY NOT NULL,
+      week_id TEXT NOT NULL,
+      employee_id TEXT NOT NULL,
+      employee_name TEXT NOT NULL,
+      date TEXT NOT NULL,
+      type TEXT NOT NULL,
+      raw_value TEXT NOT NULL,
+      source_document TEXT NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS local_payroll_entries (
       week_id TEXT NOT NULL,
       employee_id TEXT NOT NULL,
@@ -114,6 +140,34 @@ function openDatabase(path = localDatabasePath()) {
       payload_json TEXT NOT NULL
     );
   `);
+  const rosterEstimateColumns = database.prepare("PRAGMA table_info(local_roster_estimates)").all() as Array<{ name: string }>;
+  const breakColumn = rosterEstimateColumns.find((column) => column.name === "break_minutes") as { name: string; notnull?: number } | undefined;
+  if (breakColumn?.notnull || !rosterEstimateColumns.some((column) => column.name === "status")) {
+    database.exec(`
+      ALTER TABLE local_roster_estimates RENAME TO local_roster_estimates_legacy;
+      CREATE TABLE local_roster_estimates (
+        id TEXT PRIMARY KEY NOT NULL,
+        week_id TEXT NOT NULL,
+        employee_id TEXT NOT NULL,
+        employee_name TEXT NOT NULL,
+        date TEXT NOT NULL,
+        start_time TEXT NOT NULL,
+        finish_time TEXT NOT NULL,
+        break_minutes INTEGER,
+        source_document TEXT,
+        status TEXT NOT NULL DEFAULT 'manually_entered',
+        raw_finish_time TEXT,
+        review_reason TEXT
+      );
+      INSERT INTO local_roster_estimates (id, week_id, employee_id, employee_name, date, start_time, finish_time, break_minutes, source_document, status, raw_finish_time, review_reason)
+      SELECT id, week_id, employee_id, employee_name, date, start_time, finish_time, break_minutes, source_document, 'manually_entered', NULL, NULL FROM local_roster_estimates_legacy;
+      DROP TABLE local_roster_estimates_legacy;
+    `);
+    return database;
+  }
+  if (!rosterEstimateColumns.some((column) => column.name === "status")) database.exec("ALTER TABLE local_roster_estimates ADD COLUMN status TEXT NOT NULL DEFAULT 'manually_entered'");
+  if (!rosterEstimateColumns.some((column) => column.name === "raw_finish_time")) database.exec("ALTER TABLE local_roster_estimates ADD COLUMN raw_finish_time TEXT");
+  if (!rosterEstimateColumns.some((column) => column.name === "review_reason")) database.exec("ALTER TABLE local_roster_estimates ADD COLUMN review_reason TEXT");
   return database;
 }
 
@@ -150,6 +204,8 @@ function writeWeek(database: Database.Database, company: string, week: LocalWeek
   database.prepare("DELETE FROM local_documents WHERE week_id = ?").run(week.id);
   database.prepare("DELETE FROM local_photo_assignments WHERE week_id = ?").run(week.id);
   database.prepare("DELETE FROM local_shifts WHERE week_id = ?").run(week.id);
+  database.prepare("DELETE FROM local_roster_estimates WHERE week_id = ?").run(week.id);
+  database.prepare("DELETE FROM local_roster_assignments WHERE week_id = ?").run(week.id);
   database.prepare("DELETE FROM local_payroll_entries WHERE week_id = ?").run(week.id);
   database.prepare("DELETE FROM local_review_items WHERE week_id = ?").run(week.id);
   database.prepare("DELETE FROM local_weeks WHERE id = ?").run(week.id);
@@ -168,6 +224,10 @@ function writeWeek(database: Database.Database, company: string, week: LocalWeek
   for (const item of week.photoAssignments ?? []) assignment.run(item.path, week.id, item.weekStarting, item.documentType, item.documentDate, item.note);
   const shift = database.prepare("INSERT INTO local_shifts (id, week_id, employee_id, employee_name, date, start_time, finish_time, break_minutes, status, source_document) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
   for (const item of week.shifts) shift.run(item.id, week.id, item.employeeId, item.employeeName, item.date, item.startTime, item.finishTime, item.breakMinutes, item.status, item.sourceDocument ?? null);
+  const rosterEstimate = database.prepare("INSERT INTO local_roster_estimates (id, week_id, employee_id, employee_name, date, start_time, finish_time, break_minutes, source_document, status, raw_finish_time, review_reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+  for (const item of week.rosterEstimates ?? []) rosterEstimate.run(item.id, week.id, item.employeeId, item.employeeName, item.date, item.startTime, item.finishTime, item.breakMinutes, item.sourceDocument, item.status, item.rawFinishTime, item.reviewReason);
+  const rosterAssignment = database.prepare("INSERT INTO local_roster_assignments (id, week_id, employee_id, employee_name, date, type, raw_value, source_document) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+  for (const item of week.rosterAssignments ?? []) rosterAssignment.run(item.id, week.id, item.employeeId, item.employeeName, item.date, item.type, item.rawValue, item.sourceDocument);
   const payroll = database.prepare("INSERT INTO local_payroll_entries (week_id, employee_id, employee_name, ordinary_paid_minutes, sunday_paid_minutes, other_paid_minutes, displayed_total_paid_minutes) VALUES (?, ?, ?, ?, ?, ?, ?)");
   for (const item of week.payroll) payroll.run(week.id, item.employeeId, item.employeeName, item.ordinaryPaidMinutes, item.sundayPaidMinutes, item.otherPaidMinutes, item.displayedTotalPaidMinutes);
   const review = database.prepare("INSERT INTO local_review_items (id, week_id, employee_name, filename, document_path, review_type, raw, proposed, reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
@@ -245,6 +305,28 @@ function readWeek(database: Database.Database, row: WeekRow): LocalWeek {
     status: shift.status,
     sourceDocument: shift.source_document
   }));
+  const rosterEstimates = (database.prepare("SELECT id, employee_id, employee_name, date, start_time, finish_time, break_minutes, source_document, status, raw_finish_time, review_reason FROM local_roster_estimates WHERE week_id = ? ORDER BY date, employee_name").all(row.id) as RosterEstimateRow[]).map((estimate) => ({
+    id: estimate.id,
+    employeeId: estimate.employee_id,
+    employeeName: estimate.employee_name,
+    date: estimate.date,
+    startTime: estimate.start_time,
+    finishTime: estimate.finish_time,
+    breakMinutes: estimate.break_minutes,
+    sourceDocument: estimate.source_document,
+    status: estimate.status,
+    rawFinishTime: estimate.raw_finish_time,
+    reviewReason: estimate.review_reason
+  }));
+  const rosterAssignments = (database.prepare("SELECT id, employee_id, employee_name, date, type, raw_value, source_document FROM local_roster_assignments WHERE week_id = ? ORDER BY date, employee_name").all(row.id) as RosterAssignmentRow[]).map((assignment) => ({
+    id: assignment.id,
+    employeeId: assignment.employee_id,
+    employeeName: assignment.employee_name,
+    date: assignment.date,
+    type: assignment.type,
+    rawValue: assignment.raw_value,
+    sourceDocument: assignment.source_document
+  }));
   const payroll = (database.prepare("SELECT employee_id, employee_name, ordinary_paid_minutes, sunday_paid_minutes, other_paid_minutes, displayed_total_paid_minutes FROM local_payroll_entries WHERE week_id = ? ORDER BY employee_name").all(row.id) as PayrollRow[]).map((entry) => ({
     employeeId: entry.employee_id,
     employeeName: entry.employee_name,
@@ -254,7 +336,7 @@ function readWeek(database: Database.Database, row: WeekRow): LocalWeek {
     displayedTotalPaidMinutes: entry.displayed_total_paid_minutes
   }));
   const reviewItems = database.prepare("SELECT id, employee_name AS employeeName, filename, document_path AS documentPath, review_type AS reviewType, raw, proposed, reason FROM local_review_items WHERE week_id = ? ORDER BY id").all(row.id) as ReviewRow[];
-  return { id: row.id, weekStarting: row.week_starting, status: row.status, documents, photoAssignments, employees, shifts, payroll, reviewItems };
+  return { id: row.id, weekStarting: row.week_starting, status: row.status, documents, photoAssignments, employees, shifts, rosterEstimates, rosterAssignments, payroll, reviewItems };
 }
 
 export function getLocalWeeks(): LocalWeek[] {
@@ -276,6 +358,8 @@ export function writeLocalWeeks(weeks: LocalWeek[]) {
         database.prepare("DELETE FROM local_documents WHERE week_id = ?").run(row.id);
         database.prepare("DELETE FROM local_photo_assignments WHERE week_id = ?").run(row.id);
         database.prepare("DELETE FROM local_shifts WHERE week_id = ?").run(row.id);
+        database.prepare("DELETE FROM local_roster_estimates WHERE week_id = ?").run(row.id);
+        database.prepare("DELETE FROM local_roster_assignments WHERE week_id = ?").run(row.id);
         database.prepare("DELETE FROM local_payroll_entries WHERE week_id = ?").run(row.id);
         database.prepare("DELETE FROM local_review_items WHERE week_id = ?").run(row.id);
         database.prepare("DELETE FROM local_weeks WHERE id = ?").run(row.id);
