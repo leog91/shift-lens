@@ -42,11 +42,12 @@ def extract_daily_sheet(request: ExtractionRequest):
 @app.post("/extract/roster", response_model=RosterResponse)
 def extract_roster(request: ExtractionRequest):
     try:
-        image, metadata = preprocess_image(request.filePath)
-        processed_path = save_processed_preview(image, request.filePath)
+        _, metadata = preprocess_image(request.filePath)
     except Exception as exc:
         raise HTTPException(status_code=400, detail="Image could not be decoded") from exc
-    detections = engine.recognise(processed_path)
+    # Roster colour bands can lose printed text after grayscale enhancement.
+    # Paddle's own image handling retains those cells better than our preview.
+    detections = engine.recognise(request.filePath)
     context = request.rosterContext or {}
     rows = parse_roster_rows(detections, request.knownEmployees, context.get("weekStarting", request.expectedDate or ""), context.get("closeTimes", {}))
     return RosterResponse(qualityWarnings=metadata["qualityWarnings"], rows=rows)

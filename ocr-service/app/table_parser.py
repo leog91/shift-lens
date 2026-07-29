@@ -243,9 +243,9 @@ def parse_roster_rows(detections: list[TextDetection], known_employees: list[dic
             cells = sorted([item for item in row_cells if left <= detection_x(item) < right], key=detection_x)
             raw = " ".join(item.text for item in cells).strip()
             normalised_raw = normalise_name(raw)
-            if not raw or normalised_raw in {"off", "holiday", "hol", "stock", "cleaning"}:
+            if not raw or normalised_raw in {"off", "holiday", "hol", "cleaning"}:
                 continue
-            assignment_type = "standby" if "sb" in normalised_raw else "office" if normalised_raw.startswith("on") else None
+            assignment_type = "standby" if "sb" in normalised_raw else "office" if normalised_raw.startswith("on") else "stock" if normalised_raw == "stock" else None
             if assignment_type and not re.search(r"\d", raw):
                 rows.append(DailyRow.model_validate({
                     "rowIndex": len(rows),
@@ -259,7 +259,7 @@ def parse_roster_rows(detections: list[TextDetection], known_employees: list[dic
                     "finish": None,
                     "break": None,
                     "reviewRequired": True,
-                    "reviewReasons": ["Marked SB: standby/on-call assignment." if assignment_type == "standby" else "Marked On: manager/office work requires manual time entry."]
+                    "reviewReasons": ["Marked SB: standby/on-call assignment." if assignment_type == "standby" else "Marked On: manager/office work requires manual time entry." if assignment_type == "office" else "Marked stock: enter its scheduled time manually before creating an estimate."]
                 }))
                 continue
             # Roster cells abbreviate whole-hour times (for example, "3 - close"

@@ -26,7 +26,7 @@ class ExtractedValue(BaseModel):
 class DailyRow(BaseModel):
     rowIndex: int
     date: str | None = None
-    assignmentType: Literal["standby", "office"] | None = None
+    assignmentType: Literal["standby", "office", "stock"] | None = None
     rawEmployeeName: str | None
     matchedEmployeeId: str | None = None
     matchedEmployeeName: str | None = None

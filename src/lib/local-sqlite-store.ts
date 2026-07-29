@@ -10,7 +10,7 @@ type EmployeeRow = { id: string; display_name: string; active: number };
 type DocumentRow = { id: string; document_type: LocalWeek["documents"][number]["documentType"]; document_date: string | null; filename: string; path: string; quality_warnings_json: string };
 type ShiftRow = { id: string; employee_id: string; employee_name: string; date: string; start_time: string | null; finish_time: string | null; break_minutes: number | null; status: LocalWeek["shifts"][number]["status"]; source_document: string | null };
 type RosterEstimateRow = { id: string; employee_id: string; employee_name: string; date: string; start_time: string; finish_time: string; break_minutes: number | null; source_document: string | null; status: "extracted" | "confirmed" | "manually_entered"; raw_finish_time: string | null; review_reason: string | null };
-type RosterAssignmentRow = { id: string; employee_id: string; employee_name: string; date: string; type: "standby" | "office"; raw_value: string; source_document: string };
+type RosterAssignmentRow = { id: string; employee_id: string; employee_name: string; date: string; type: "standby" | "office" | "stock"; raw_value: string; source_document: string };
 type PayrollRow = { employee_id: string; employee_name: string; ordinary_paid_minutes: number; sunday_paid_minutes: number; other_paid_minutes: number; displayed_total_paid_minutes: number | null };
 type ReviewRow = LocalWeek["reviewItems"][number];
 

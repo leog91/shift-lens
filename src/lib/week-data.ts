@@ -58,7 +58,7 @@ const LocalWeekSchema = z.object({
     employeeId: z.string(),
     employeeName: z.string(),
     date: z.string(),
-    type: z.enum(["standby", "office"]),
+    type: z.enum(["standby", "office", "stock"]),
     rawValue: z.string(),
     sourceDocument: z.string()
   })).optional(),

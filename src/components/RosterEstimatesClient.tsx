@@ -32,7 +32,7 @@ interface RosterAssignment {
   employeeId: string;
   employeeName: string;
   date: string;
-  type: "standby" | "office";
+  type: "standby" | "office" | "stock";
   rawValue: string;
   sourceDocument: string;
 }
@@ -66,13 +66,13 @@ export function RosterEstimatesClient({ weekId, weekStarting, employees, rosterD
     setMessage(null);
     try {
       const response = await fetch("/api/roster-estimates/extract", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ weekId, documentId: rosterDocuments[0].id }) });
-      const result = await response.json() as { ok: boolean; error?: string; createdEstimates?: number; createdAssignments?: number; qualityWarnings?: string[] };
+       const result = await response.json() as { ok: boolean; error?: string; createdEstimates?: number; createdAssignments?: number; qualityWarnings?: string[] };
       if (!response.ok || !result.ok) throw new Error(result.error ?? "Unable to extract roster.");
       const elapsedSeconds = Math.max(1, Math.round((Date.now() - startedAt) / 1000));
       const estimates = result.createdEstimates ?? 0;
       const assignments = result.createdAssignments ?? 0;
       const warnings = result.qualityWarnings?.length ? ` ${result.qualityWarnings.join(" ")}` : "";
-      setMessage(estimates || assignments ? `OCR completed in ${elapsedSeconds}s: added ${estimates} shift proposal(s) and ${assignments} standby/office assignment(s). Review each row before confirmation.${warnings}` : `OCR completed in ${elapsedSeconds}s but did not identify any usable roster rows. Check the image type, employee aliases, and whether the roster grid is fully visible.${warnings}`);
+       setMessage(estimates || assignments ? `OCR completed in ${elapsedSeconds}s: added ${estimates} shift proposal(s) and ${assignments} manual-time assignment(s). Review each row before confirmation.${warnings}` : `OCR completed in ${elapsedSeconds}s but did not identify any usable roster rows. Check the image type, employee aliases, and whether the roster grid is fully visible.${warnings}`);
       window.setTimeout(() => window.location.reload(), 3500);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to extract roster.");
@@ -127,7 +127,7 @@ export function RosterEstimatesClient({ weekId, weekStarting, employees, rosterD
       </div>
       <div className="rounded bg-stone-50 p-3 text-sm"><h3 className="font-medium">Estimated weekly total</h3><dl className="mt-2 space-y-1">{[...totals.values()].sort((a, b) => a.name.localeCompare(b.name)).map((total) => <div className="flex justify-between gap-3" key={total.name}><dt>{total.name}</dt><dd className="font-medium">{formatDuration(total.minutes)}</dd></div>)}</dl></div>
     </div> : <p className="mt-4 text-sm text-stone-600">No roster estimates entered yet.</p>}
-    {assignments.length ? <div className="mt-4 rounded bg-amber-50 p-3 text-sm text-amber-950"><h3 className="font-medium">Roster assignments needing manual time entry</h3><ul className="mt-2 space-y-1">{assignments.map((assignment) => <li key={assignment.id}>{assignment.date}: {assignment.employeeName} - {assignment.type === "standby" ? "standby/on-call" : "office work"} ({assignment.rawValue})</li>)}</ul><p className="mt-2">These assignment counts are not included in estimated hours.</p></div> : null}
+    {assignments.length ? <div className="mt-4 rounded bg-amber-50 p-3 text-sm text-amber-950"><h3 className="font-medium">Roster assignments needing manual time entry</h3><ul className="mt-2 space-y-1">{assignments.map((assignment) => <li key={assignment.id}>{assignment.date}: {assignment.employeeName} - {assignment.type === "standby" ? "standby/on-call" : assignment.type === "office" ? "office work" : "stock work"} ({assignment.rawValue})</li>)}</ul><p className="mt-2">These assignments are not included in estimated hours until a time is entered manually.</p></div> : null}
   </section>;
 }
 

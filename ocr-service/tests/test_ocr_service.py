@@ -8,7 +8,7 @@ from app.main import app
 from app.preprocessing import decode_image, preprocess_image
 from app.quality import quality_warnings
 from app.schemas import DailySheetResponse, TextDetection, BoundingBox
-from app.table_parser import group_columns, group_rows, parse_daily_rows
+from app.table_parser import group_columns, group_rows, parse_daily_rows, parse_roster_rows
 from app.payslip_parser import parse_hour_value, parse_payslip
 
 
@@ -68,6 +68,24 @@ def test_fuzzy_employee_label_creates_partial_review_row():
     assert rows[0].start.rawValue == "16:00"
     assert rows[0].finish is None
     assert "Employee name was matched approximately from OCR text." in rows[0].reviewReasons
+
+
+def test_roster_parser_keeps_coloured_row_shifts_and_stock_assignment():
+    detections = [
+        TextDetection(text=day, boundingBox=BoundingBox(x=index * 100, y=10, width=30, height=10))
+        for index, day in enumerate(["Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], start=2)
+    ] + [
+        TextDetection(text="Leo", boundingBox=BoundingBox(x=10, y=100, width=30, height=10)),
+        TextDetection(text="9.30 - 3", boundingBox=BoundingBox(x=200, y=100, width=50, height=10)),
+        TextDetection(text="5 - close", boundingBox=BoundingBox(x=400, y=100, width=50, height=10)),
+        TextDetection(text="5 - close", boundingBox=BoundingBox(x=500, y=100, width=50, height=10)),
+        TextDetection(text="5 - close", boundingBox=BoundingBox(x=600, y=100, width=50, height=10)),
+        TextDetection(text="stock", boundingBox=BoundingBox(x=700, y=100, width=50, height=10)),
+    ]
+    rows = parse_roster_rows(detections, [{"id": "leo", "displayName": "Leo", "aliases": []}], "2026-07-27", {"thursday": "22:00", "friday": "23:00", "saturday": "23:00"})
+    shifts = [(row.date, row.start.normalisedValue, row.finish.normalisedValue) for row in rows if row.start]
+    assert shifts == [("2026-07-28", "09:30", "15:00"), ("2026-07-30", "17:00", "22:00"), ("2026-07-31", "17:00", "23:00"), ("2026-08-01", "17:00", "23:00")]
+    assert rows[-1].assignmentType == "stock"
 
 
 def test_invalid_image_handling(tmp_path):

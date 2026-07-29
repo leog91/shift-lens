@@ -52,6 +52,7 @@ export async function POST(request: NextRequest) {
       const startTime = row.start?.normalisedValue ?? row.start?.rawValue ?? null;
       const finishTime = row.finish?.normalisedValue ?? row.finish?.rawValue ?? null;
       if (!employee || !row.date || !startTime || !finishTime || !timePattern.test(startTime) || !timePattern.test(finishTime)) continue;
+      if (retained.some((estimate) => estimate.sourceDocument === document.filename && estimate.employeeId === employee.id && estimate.date === row.date && estimate.startTime === startTime && estimate.finishTime === finishTime)) continue;
       retained.push({
         id: `roster-ocr-${randomUUID()}`,
         employeeId: employee.id,
