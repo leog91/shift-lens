@@ -65,6 +65,8 @@ Important: WhatsApp filenames are capture/share timestamps. They are not the she
 
 If the visible title and assigned date disagree, fix the assignment before extracting rows.
 
+Changing a document type removes only unconfirmed OCR proposals and review items created from that document. Confirmed and manually entered records remain in place.
+
 ## Organizing Originals
 
 Uploads are placed in `photo-inbox/manual-review/` without pre-sorting them. Files without an assignment stay there for manual handling. After assigning and checking dates, use `Move assigned photos` in `/photos` to move assigned originals into `photo-inbox/organized/<week-start>/` with a date-and-type filename.
@@ -117,6 +119,14 @@ Roster pages help answer questions like:
 - Does a paper look like it belongs near this week?
 
 Roster rows must not overwrite actual handwritten values. If a roster suggests someone was scheduled but the actual sheet is missing or unclear, keep that as context and request/inspect the actual paper.
+
+Use `Extract roster proposals` on the Roster page when local OCR is running. It creates review-required estimated shifts only; it never adds actual hours or changes the payroll comparison. Check each proposed employee, date, start, finish, and break before confirming it.
+
+- `CLOSE` uses the configured restaurant closing time and is shown with that interpretation for review.
+- A split shift becomes separate proposals. The gap is an unpaid split-shift break.
+- `SB` and office assignments are listed as manual-time assignments and are excluded from estimated hours.
+- `stock` is also a manual-time assignment. It has no inferred duration: enter a roster estimate manually only when the time is known for that specific date. For example, enter 4 hours 30 minutes only after confirming that Sunday's stock shift is 4 hours 30 minutes.
+- Refreshing roster OCR replaces prior unconfirmed proposals from that roster image while preserving confirmed and manually entered estimates.
 
 ## Payslip Review
 
