@@ -195,3 +195,129 @@ def parse_daily_rows(detections: list[TextDetection], known_employees: list[dict
             reasons.append("Required row field could not be read confidently.")
         parsed.append(DailyRow.model_validate({"rowIndex": index, "rawEmployeeName": employee, "start": start, "finish": finish, "break": break_value, "reviewRequired": bool(reasons), "reviewReasons": reasons}))
     return parsed
+
+
+def parse_roster_rows(detections: list[TextDetection], known_employees: list[dict], week_starting: str, close_times: dict[str, str]) -> list[DailyRow]:
+    """Read a weekly roster grid; every proposal remains review-required."""
+    day_names = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+    day_prefixes = {day[:3]: index for index, day in enumerate(day_names)}
+    day_columns: list[tuple[int, float]] = []
+    for item in detections:
+        if not item.boundingBox:
+            continue
+        text = normalise_name(item.text)
+        for prefix, index in day_prefixes.items():
+            if text.startswith(prefix):
+                day_columns.append((index, detection_x(item)))
+                break
+    day_columns = list(dict(day_columns).items())
+    # Some rosters label Monday with only the date (for example "27 July")
+    # and abbreviate the remaining headers to Tue-Sun. Recover Monday's column
+    # from the regular weekly grid rather than treating the roster as unreadable.
+    if len(day_columns) == 6 and all(index in dict(day_columns) for index in range(1, 7)):
+        columns_by_day = dict(day_columns)
+        gap = columns_by_day[2] - columns_by_day[1]
+        day_columns.append((0, columns_by_day[1] - gap))
+    if len(day_columns) < 7:
+        return []
+    day_columns.sort()
+    employee_matches: dict[str, dict] = {}
+    for employee in known_employees:
+        for name in [employee.get("displayName", ""), *employee.get("aliases", [])]:
+            if name:
+                employee_matches[normalise_name(name)] = employee
+    start_of_week = __import__("datetime").date.fromisoformat(week_starting)
+    rows: list[DailyRow] = []
+    for label in detections:
+        if not label.boundingBox:
+            continue
+        employee, fuzzy = match_employee_name(label.text, employee_matches)
+        if not employee:
+            continue
+        row_cells = [item for item in detections if item.boundingBox and abs(detection_y(item) - detection_y(label)) <= 22 and detection_x(item) > detection_x(label) + 20]
+        for day_index, column_x in day_columns:
+            next_x = next((x for next_index, x in day_columns if next_index == day_index + 1), column_x + 160)
+            previous_x = next((x for previous_index, x in reversed(day_columns) if previous_index == day_index - 1), column_x - 160)
+            left = (previous_x + column_x) / 2
+            right = (column_x + next_x) / 2
+            cells = sorted([item for item in row_cells if left <= detection_x(item) < right], key=detection_x)
+            raw = " ".join(item.text for item in cells).strip()
+            normalised_raw = normalise_name(raw)
+            if not raw or normalised_raw in {"off", "holiday", "hol", "stock", "cleaning"}:
+                continue
+            assignment_type = "standby" if "sb" in normalised_raw else "office" if normalised_raw.startswith("on") else None
+            if assignment_type and not re.search(r"\d", raw):
+                rows.append(DailyRow.model_validate({
+                    "rowIndex": len(rows),
+                    "date": str(start_of_week + __import__("datetime").timedelta(days=day_index)),
+                    "rawEmployeeName": label.text,
+                    "matchedEmployeeId": employee.get("id"),
+                    "matchedEmployeeName": employee.get("displayName"),
+                    "employeeMatchConfidence": label.confidence,
+                    "assignmentType": assignment_type,
+                    "start": None,
+                    "finish": None,
+                    "break": None,
+                    "reviewRequired": True,
+                    "reviewReasons": ["Marked SB: standby/on-call assignment." if assignment_type == "standby" else "Marked On: manager/office work requires manual time entry."]
+                }))
+                continue
+            # Roster cells abbreviate whole-hour times (for example, "3 - close"
+            # means 15:00 to close) and may contain two shifts separated by a slash.
+            matches = re.findall(r"(\d{1,2}(?:[:.]\d{2})?)\s*[-–]\s*(\d{1,2}(?:[:.]\d{2})?|cl(?:ose)?)", raw, re.IGNORECASE)
+            if not matches:
+                # Faint printed dashes are often dropped by OCR. Within one grid
+                # cell, two time tokens still form a review-required shift.
+                tokens = re.findall(r"\d{1,2}(?:[:.]\d{2})?|cl(?:ose)?", raw, re.IGNORECASE)
+                if len(tokens) == 2:
+                    matches = [(tokens[0], tokens[1])]
+            for start_raw, finish_raw in matches:
+                def clock(value: str) -> str:
+                    value = value.replace(".", ":")
+                    if ":" in value:
+                        hours, minutes = value.split(":", 1)
+                        hour = int(hours)
+                        if 1 <= hour <= 7:
+                            hour += 12
+                        return f"{hour:02d}:{int(minutes):02d}"
+                    hour = int(value)
+                    # This roster omits PM for afternoon/evening times 1-7.
+                    if 1 <= hour <= 7:
+                        hour += 12
+                    return f"{hour:02d}:00"
+
+                start = clock(start_raw)
+                close = finish_raw.lower().startswith("cl")
+                finish = close_times.get(day_names[day_index], "") if close else clock(finish_raw)
+                if not close and finish <= start:
+                    # A bare finish such as "2 - 9" is an afternoon/evening
+                    # shift, not an overnight shift from 14:00 to 09:00.
+                    finish_hour, finish_minute = map(int, finish.split(":"))
+                    finish = f"{finish_hour + 12:02d}:{finish_minute:02d}"
+                if not finish:
+                    continue
+                reasons = ["Roster OCR proposal requires review before it is treated as an estimate. The break defaults to 0 minutes and can be edited before confirmation."]
+                if len(matches) > 1:
+                    reasons.append("This is a split shift. The gap between its two roster entries is the unpaid break.")
+                if "sb" in normalised_raw:
+                    reasons.append("Marked SB: standby/on-call roster assignment.")
+                if "tr" in normalised_raw:
+                    reasons.append("Marked TR: training roster assignment.")
+                if close:
+                    reasons.append(f"CLOSE was interpreted using the configured {finish} close time.")
+                if fuzzy:
+                    reasons.append("Employee name was matched approximately from OCR text.")
+                rows.append(DailyRow.model_validate({
+                    "rowIndex": len(rows),
+                    "date": str(start_of_week + __import__("datetime").timedelta(days=day_index)),
+                    "rawEmployeeName": label.text,
+                    "matchedEmployeeId": employee.get("id"),
+                    "matchedEmployeeName": employee.get("displayName"),
+                    "employeeMatchConfidence": label.confidence,
+                    "start": {"rawValue": start_raw, "normalisedValue": start, "confidence": label.confidence},
+                    "finish": {"rawValue": finish_raw.upper() if close else finish_raw, "normalisedValue": finish, "confidence": label.confidence},
+                    "break": None,
+                    "reviewRequired": True,
+                    "reviewReasons": reasons,
+                }))
+    return rows

@@ -13,6 +13,8 @@ export const ExtractedValueSchema = z.object({
 
 export const DailySheetRowSchema = z.object({
   rowIndex: z.number().int(),
+  date: z.string().nullable().optional(),
+  assignmentType: z.enum(["standby", "office"]).nullable().optional(),
   rawEmployeeName: z.string().nullable(),
   matchedEmployeeId: z.string().nullable().optional(),
   matchedEmployeeName: z.string().nullable().optional(),

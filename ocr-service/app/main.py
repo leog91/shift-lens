@@ -5,7 +5,7 @@ from .payslip_parser import parse_payslip
 from .preprocessing import preprocess_image, save_processed_preview
 from .schemas import DailySheetResponse, ExtractionRequest, PayslipResponse, PreprocessResponse, RosterResponse
 from .settings import settings
-from .table_parser import parse_daily_rows
+from .table_parser import parse_daily_rows, parse_roster_rows
 
 app = FastAPI(title="ShiftLens OCR Service")
 
@@ -41,8 +41,15 @@ def extract_daily_sheet(request: ExtractionRequest):
 
 @app.post("/extract/roster", response_model=RosterResponse)
 def extract_roster(request: ExtractionRequest):
-    daily = extract_daily_sheet(request)
-    return RosterResponse(qualityWarnings=daily.qualityWarnings, rows=daily.rows)
+    try:
+        image, metadata = preprocess_image(request.filePath)
+        processed_path = save_processed_preview(image, request.filePath)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="Image could not be decoded") from exc
+    detections = engine.recognise(processed_path)
+    context = request.rosterContext or {}
+    rows = parse_roster_rows(detections, request.knownEmployees, context.get("weekStarting", request.expectedDate or ""), context.get("closeTimes", {}))
+    return RosterResponse(qualityWarnings=metadata["qualityWarnings"], rows=rows)
 
 
 @app.post("/extract/payslip", response_model=PayslipResponse)
