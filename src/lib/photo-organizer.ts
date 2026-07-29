@@ -75,6 +75,8 @@ export function relinkPhotoPaths(week: LocalWeek, paths: Map<string, string>): L
     }),
     photoAssignments: week.photoAssignments.map((assignment) => ({ ...assignment, path: paths.get(assignment.path) ?? assignment.path })),
     shifts: week.shifts.map((shift) => ({ ...shift, sourceDocument: shift.sourceDocument ? filenames.get(shift.sourceDocument) ?? shift.sourceDocument : shift.sourceDocument })),
+    rosterEstimates: (week.rosterEstimates ?? []).map((estimate) => ({ ...estimate, sourceDocument: estimate.sourceDocument ? filenames.get(estimate.sourceDocument) ?? estimate.sourceDocument : estimate.sourceDocument })),
+    rosterAssignments: (week.rosterAssignments ?? []).map((assignment) => ({ ...assignment, sourceDocument: filenames.get(assignment.sourceDocument) ?? assignment.sourceDocument })),
     reviewItems: week.reviewItems.map((item) => ({
       ...item,
       filename: filenames.get(item.filename) ?? item.filename,
@@ -92,13 +94,13 @@ export function organizeAssignedPhotos() {
   const reserved = new Set<string>();
 
   for (const [path, reference] of [...references.entries()].sort(([a], [b]) => a.localeCompare(b))) {
-    if (path.startsWith(`${organizedRoot}/${reference.weekStarting}/`)) continue;
     const source = resolve(localProfileDirectory(), path);
     if (!source.startsWith(localProfilePath(photoRoot)) || !existsSync(source)) throw new Error(`Assigned photo was not found: ${path}`);
     const directory = localProfilePath(organizedRoot, reference.weekStarting);
     mkdirSync(directory, { recursive: true });
     let index = 1;
     let destination = join(directory, organisedFilename(path, reference, index));
+    if (resolve(destination) === source) continue;
     while (existsSync(destination) || reserved.has(destination)) {
       index += 1;
       destination = join(directory, organisedFilename(path, reference, index));

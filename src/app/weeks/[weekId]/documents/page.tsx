@@ -19,6 +19,7 @@ export default async function DocumentsPage({ params }: { params: Promise<{ week
               </div>
               <img alt={document.filename} className="max-h-[520px] w-full rounded border object-contain" src={documentUrl(document.path)} />
               {document.qualityWarnings.length ? <ul className="mt-2 list-disc pl-5 text-sm text-amber-800">{document.qualityWarnings.map((warning) => <li key={warning}>{warning}</li>)}</ul> : null}
+              {isLocalDataMode() ? <a className="mt-3 inline-block text-sm text-blue-700 underline-offset-2 hover:underline" href={`/photos#photo-${encodeURIComponent(document.path)}`}>Change assignment or type</a> : null}
             </article>
           ))}
         </div>

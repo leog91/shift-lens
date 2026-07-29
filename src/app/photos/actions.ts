@@ -29,6 +29,7 @@ export async function assignPhoto(formData: FormData) {
   writeLocalExtraWeeks(updatedWeeks.slice(1));
   revalidatePath("/photos");
   revalidatePath("/weeks");
+  revalidatePath("/weeks", "layout");
 }
 
 export async function organizePhotos() {

@@ -50,11 +50,20 @@ export function applyPhotoDocumentAssignment(weeks: LocalWeek[], input: PhotoAss
   if (input.documentDate != null && !isIsoDate(input.documentDate)) throw new Error("Document date must be YYYY-MM-DD.");
 
   if (input.documentType === "unknown") {
+    const existingDocument = weeks.flatMap((week) => week.documents).find((document) => document.path === input.path);
     const targetWeekIndex = weeks.findIndex((week) => week.weekStarting === input.weekStarting);
+    const withoutDocument = weeks.map((week) => ({
+      ...week,
+      documents: week.documents.filter((document) => document.path !== input.path),
+      shifts: existingDocument && week.documents.some((document) => document.path === input.path) ? week.shifts.filter((shift) => !(shift.sourceDocument === existingDocument.filename && shift.id.startsWith("ocr-") && shift.status === "uncertain")) : week.shifts,
+      rosterEstimates: existingDocument && week.documents.some((document) => document.path === input.path) ? (week.rosterEstimates ?? []).filter((estimate) => !(estimate.sourceDocument === existingDocument.filename && estimate.status === "extracted")) : week.rosterEstimates,
+      rosterAssignments: existingDocument && week.documents.some((document) => document.path === input.path) ? (week.rosterAssignments ?? []).filter((assignment) => assignment.sourceDocument !== existingDocument.filename) : week.rosterAssignments,
+      reviewItems: existingDocument && week.documents.some((document) => document.path === input.path) ? week.reviewItems.filter((item) => item.filename !== existingDocument.filename) : week.reviewItems
+    }));
     if (targetWeekIndex >= 0) {
-      return weeks.map((week, index) => index === targetWeekIndex ? applyPhotoAssignment(week, input) : week);
+      return withoutDocument.map((week, index) => index === targetWeekIndex ? applyPhotoAssignment(week, input) : week);
     }
-    return [...weeks, applyPhotoAssignment({
+    return [...withoutDocument, applyPhotoAssignment({
       id: weekIdFromStart(input.weekStarting),
       weekStarting: input.weekStarting,
       status: "needs_review",
@@ -90,11 +99,20 @@ export function applyPhotoDocumentAssignment(weeks: LocalWeek[], input: PhotoAss
     qualityWarnings: existingDocument?.qualityWarnings?.length ? existingDocument.qualityWarnings : ["Assigned from photo inbox; rows still need manual extraction and confirmation before totals."]
   };
 
-  const weeksWithoutDocument = weeks.map((week) => ({
-    ...week,
-    documents: week.documents.filter((document) => document.path !== input.path),
-    photoAssignments: (week.photoAssignments ?? []).filter((assignment) => assignment.path !== input.path)
-  }));
+  const weeksWithoutDocument = weeks.map((week) => {
+    const reclassifying = existingDocument?.documentType !== input.documentType && week.documents.some((document) => document.path === input.path);
+    const sourceDocument = existingDocument?.filename;
+    return {
+      ...week,
+      documents: week.documents.filter((document) => document.path !== input.path),
+      photoAssignments: (week.photoAssignments ?? []).filter((assignment) => assignment.path !== input.path),
+      // Reclassification removes only replaceable OCR proposals. Confirmed and manually entered evidence remains intact.
+      shifts: reclassifying && sourceDocument ? week.shifts.filter((shift) => !(shift.sourceDocument === sourceDocument && shift.id.startsWith("ocr-") && shift.status === "uncertain")) : week.shifts,
+      rosterEstimates: reclassifying && sourceDocument ? (week.rosterEstimates ?? []).filter((estimate) => !(estimate.sourceDocument === sourceDocument && estimate.status === "extracted")) : week.rosterEstimates,
+      rosterAssignments: reclassifying && sourceDocument ? (week.rosterAssignments ?? []).filter((assignment) => assignment.sourceDocument !== sourceDocument) : week.rosterAssignments,
+      reviewItems: reclassifying && sourceDocument ? week.reviewItems.filter((item) => item.filename !== sourceDocument) : week.reviewItems
+    };
+  });
 
   if (targetWeekIndex >= 0) {
     return weeksWithoutDocument.map((week, index) => index === targetWeekIndex ? { ...week, documents: [...week.documents, updatedDocument] } : week);

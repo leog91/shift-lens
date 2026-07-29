@@ -92,12 +92,15 @@ function PhotoCard({ file, weekStarting, showForm = false }: { file: PhotoFile; 
 }
 
 function PhotoAssignmentForm({ file, weekStarting }: { file: PhotoFile; weekStarting: string }) {
+  const suggestedType = /roster|schedule|rota/i.test(file.filename) ? "roster" : /payslip|payroll|wage/i.test(file.filename) ? "payslip" : "unknown";
+  const selectedType = file.documentType ?? suggestedType;
   return <form action={assignPhoto} className="photo-assignment-form">
     <input name="path" type="hidden" value={file.path} />
     <label>Week starting<input defaultValue={file.assignedWeekStarting ?? weekStarting} name="weekStarting" type="date" /></label>
     <label>Document date<input defaultValue={file.documentDate ?? ""} name="documentDate" type="date" /></label>
-    <label>Type<select defaultValue={file.documentType ?? "daily_sheet"} name="documentType"><option value="daily_sheet">daily sheet</option><option value="roster">roster</option><option value="payslip">payslip</option><option value="unknown">unknown</option></select></label>
+    <label>Type<select defaultValue={selectedType} name="documentType"><option value="unknown">unknown - choose after review</option><option value="daily_sheet">daily sheet</option><option value="roster">roster</option><option value="payslip">payslip</option></select></label>
     <label>Note<input defaultValue={file.assignmentNote ?? ""} name="note" placeholder="optional" /></label>
     <button className="button-primary" type="submit">Save assignment</button>
+    {file.documentType ? <p className="text-xs text-amber-900">Changing the type removes unconfirmed OCR proposals and review items from this document. Confirmed and manual entries are kept.</p> : <p className="text-xs text-stone-600">Suggested type: {suggestedType.replace("_", " ")}. Check the image and choose the final type before saving.</p>}
   </form>;
 }
