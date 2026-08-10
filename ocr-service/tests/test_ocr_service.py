@@ -102,6 +102,22 @@ def test_roster_parser_reads_a_finish_after_midnight():
     assert "This shift was read as finishing after midnight." in rows[0].reviewReasons
 
 
+def test_high_resolution_sheet_still_finds_its_columns():
+    # The same sheet at 4x: 100px text, so a cell sits 130px from its header
+    # centre and 40px below the name. Both exceed the tolerances tuned for 25px
+    # text, and the row would be read as having no times at all.
+    detections = [
+        TextDetection(text="Start", boundingBox=BoundingBox(x=400, y=40, width=120, height=100)),
+        TextDetection(text="Finish", boundingBox=BoundingBox(x=1200, y=40, width=160, height=100)),
+        TextDetection(text="Victor", confidence=0.9, boundingBox=BoundingBox(x=40, y=360, width=160, height=100)),
+        TextDetection(text="16:00", boundingBox=BoundingBox(x=520, y=400, width=140, height=100)),
+        TextDetection(text="23:30", boundingBox=BoundingBox(x=1320, y=400, width=140, height=100)),
+    ]
+    rows = parse_daily_rows(detections, [{"id": "victor", "displayName": "Victor", "aliases": []}])
+    assert len(rows) == 1
+    assert (rows[0].start.rawValue, rows[0].finish.rawValue) == ("16:00", "23:30")
+
+
 def test_invalid_image_handling(tmp_path):
     path = tmp_path / "bad.jpg"
     path.write_text("not an image")

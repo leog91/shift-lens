@@ -4,6 +4,23 @@ from difflib import SequenceMatcher
 from .schemas import DailyRow, ExtractedValue, TextDetection
 
 
+REFERENCE_TEXT_HEIGHT = 25.0
+
+
+def detection_scale(detections: list[TextDetection]) -> float:
+    """Scale the pixel tolerances below to the size of the text in this photo.
+
+    They were tuned against sheets whose text is roughly 25px tall. A higher
+    resolution photo of the same sheet needs proportionally wider windows, or
+    the column cells fall outside them and the row is read as empty. Never
+    tighten below the tuned values, so lower resolution photos are unaffected.
+    """
+    heights = sorted(item.boundingBox.height for item in detections if item.boundingBox and item.boundingBox.height > 0)
+    if not heights:
+        return 1.0
+    return max(1.0, heights[len(heights) // 2] / REFERENCE_TEXT_HEIGHT)
+
+
 def looks_like_time(value: str) -> bool:
     return bool(re.match(r"^\d{1,2}[:\.]\d{2}$", value.strip()))
 
@@ -58,7 +75,9 @@ def assign_time_by_cluster(row: list[TextDetection], start_x: float, finish_x: f
     return start, finish
 
 
-def group_rows(detections: list[TextDetection], tolerance: float = 18) -> list[list[TextDetection]]:
+def group_rows(detections: list[TextDetection], tolerance: float | None = None) -> list[list[TextDetection]]:
+    if tolerance is None:
+        tolerance = 18 * detection_scale(detections)
     sorted_items = sorted([d for d in detections if d.boundingBox], key=lambda d: d.boundingBox.y if d.boundingBox else 0)
     rows: list[list[TextDetection]] = []
     for item in sorted_items:
@@ -113,11 +132,11 @@ def match_employee_name(value: str, matches: dict[str, dict]) -> tuple[dict | No
     return matches[closest_name], True
 
 
-def nearest_cell(row: list[TextDetection], x: float | None) -> ExtractedValue | None:
+def nearest_cell(row: list[TextDetection], x: float | None, scale: float = 1.0) -> ExtractedValue | None:
     if x is None:
         return None
     header_labels = {"name", "start", "ta", "finish", "break", "stafffood"}
-    candidates = [item for item in row if item.boundingBox and normalise_name(item.text) not in header_labels and abs(detection_x(item) - x) < 95]
+    candidates = [item for item in row if item.boundingBox and normalise_name(item.text) not in header_labels and abs(detection_x(item) - x) < 95 * scale]
     if not candidates:
         return None
     item = min(candidates, key=lambda candidate: abs(detection_x(candidate) - x))
@@ -125,6 +144,7 @@ def nearest_cell(row: list[TextDetection], x: float | None) -> ExtractedValue | 
 
 
 def parse_daily_rows(detections: list[TextDetection], known_employees: list[dict] | None = None) -> list[DailyRow]:
+    scale = detection_scale(detections)
     if known_employees:
         header_x = {
             "start": find_header_x(detections, "Start"),
@@ -149,10 +169,10 @@ def parse_daily_rows(detections: list[TextDetection], known_employees: list[dict
             employee, fuzzy_match = match_employee_name(item.text, matches)
             if not employee:
                 continue
-            row = [candidate for candidate in detections if candidate.boundingBox and abs(detection_y(candidate) - detection_y(item)) <= 28]
-            start = nearest_cell(row, header_x["start"])
-            finish = nearest_cell(row, header_x["finish"])
-            break_value = nearest_cell(row, header_x["break"])
+            row = [candidate for candidate in detections if candidate.boundingBox and abs(detection_y(candidate) - detection_y(item)) <= 28 * scale]
+            start = nearest_cell(row, header_x["start"], scale)
+            finish = nearest_cell(row, header_x["finish"], scale)
+            break_value = nearest_cell(row, header_x["break"], scale)
             # If header positions failed to locate the times, fall back to clustering.
             if (start is None or finish is None) and cluster_start_x is not None and cluster_finish_x is not None:
                 fallback_start, fallback_finish = assign_time_by_cluster(row, cluster_start_x, cluster_finish_x)
@@ -199,6 +219,7 @@ def parse_daily_rows(detections: list[TextDetection], known_employees: list[dict
 
 def parse_roster_rows(detections: list[TextDetection], known_employees: list[dict], week_starting: str, close_times: dict[str, str]) -> list[DailyRow]:
     """Read a weekly roster grid; every proposal remains review-required."""
+    scale = detection_scale(detections)
     day_names = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
     day_prefixes = {day[:3]: index for index, day in enumerate(day_names)}
     day_columns: list[tuple[int, float]] = []
@@ -234,9 +255,9 @@ def parse_roster_rows(detections: list[TextDetection], known_employees: list[dic
         employee, fuzzy = match_employee_name(label.text, employee_matches)
         if not employee:
             continue
-        row_cells = [item for item in detections if item.boundingBox and abs(detection_y(item) - detection_y(label)) <= 22 and detection_x(item) > detection_x(label) + 20]
+        row_cells = [item for item in detections if item.boundingBox and abs(detection_y(item) - detection_y(label)) <= 22 * scale and detection_x(item) > detection_x(label) + 20 * scale]
         for day_index, column_x in day_columns:
-            next_x = next((x for next_index, x in day_columns if next_index == day_index + 1), column_x + 160)
+            next_x = next((x for next_index, x in day_columns if next_index == day_index + 1), column_x + 160 * scale)
             previous_x = next((x for previous_index, x in reversed(day_columns) if previous_index == day_index - 1), column_x - 160)
             left = (previous_x + column_x) / 2
             right = (column_x + next_x) / 2
