@@ -9,9 +9,6 @@
     "dev:web": "next dev",
     "dev:ocr": "cd ocr-service && .venv/bin/python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8001",
     "profile:init": "bun run scripts/init-profile.ts",
-    "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
-    "db:seed": "bun run src/db/seed.ts",
     "test": "bun test tests/unit && cd ocr-service && .venv/bin/python -m pytest",
     "test:unit": "bun test tests/unit",
     "test:e2e": "playwright test",
@@ -20,9 +17,7 @@
     "build": "next build"
   },
   "dependencies": {
-    "@libsql/client": "latest",
     "better-sqlite3": "latest",
-    "drizzle-orm": "latest",
     "fast-fuzzy": "latest",
     "next": "latest",
     "react": "latest",
@@ -38,7 +33,6 @@
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
-    "drizzle-kit": "latest",
     "eslint": "^9.39.1",
     "eslint-config-next": "latest",
     "tailwindcss": "latest",

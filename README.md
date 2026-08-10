@@ -22,7 +22,7 @@ ShiftLens is not a payroll, tax, employment-law, salary, premium, overtime, or e
 ## Architecture
 
 - Next.js App Router is the main product.
-- SQLite stores local data through Drizzle ORM. The public demo uses a separate in-memory SQLite database seeded only with committed fictional records.
+- SQLite stores local data. Each profile keeps its own `data/shiftlens.sqlite`, read and written directly through `src/lib/local-sqlite-store.ts`. The public demo uses a separate in-memory SQLite database seeded only with committed fictional records.
 - Deterministic TypeScript functions under `src/domain/reconciliation/` do all calculations.
 - FastAPI under `ocr-service/` is a local OCR companion.
 - OCR providers are isolated behind `DocumentExtractor` adapters: `PaddleOcrExtractor`, `ManualExtractor`, and an optional structured `OpenAiVisionExtractor`.
@@ -44,10 +44,10 @@ Install web dependencies:
 bun install
 ```
 
-Create and seed local data:
+Create a local profile to hold your data. The demo workspace needs no setup:
 
 ```bash
-bun run db:seed
+bun run profile:init profiles/restaurant-a "Restaurant A"
 ```
 
 Set up OCR service:
@@ -118,7 +118,7 @@ Start ShiftLens for one profile at a time. `SHIFT_LENS_DATA_MODE=local` is requi
 SHIFT_LENS_PROFILE_DIR=profiles/restaurant-a bun run
 ```
 
-Use the same environment variable when running the optional SQLite seed or Drizzle commands. The default, when no variable is supplied, remains the repository's local `data/` and `photo-inbox/` folders for backwards compatibility.
+Use the same environment variable for any command that touches profile storage. The default, when no variable is supplied, remains the repository's local `data/` and `photo-inbox/` folders for backwards compatibility.
 
 To move the current business into its own profile, stop the app first, then move both storage folders together:
 
