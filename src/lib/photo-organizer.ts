@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readdirSync, renameSync, statSync } from "node:f
 import { basename, extname, join, resolve } from "node:path";
 import { readLocalExtraWeeks, readLocalWeek, writeLocalExtraWeeks, writeLocalWeek } from "./local-week-store";
 import type { LocalWeek } from "./week-data";
-import { manualReviewPhotoRoot, organizedPhotoRoot, photoInboxRoot } from "./photo-inbox";
+import { isInsideDirectory, manualReviewPhotoRoot, organizedPhotoRoot, photoInboxRoot } from "./photo-inbox";
 import { localProfileDirectory, localProfilePath } from "./local-profile";
 
 const photoRoot = photoInboxRoot;
@@ -95,7 +95,7 @@ export function organizeAssignedPhotos() {
 
   for (const [path, reference] of [...references.entries()].sort(([a], [b]) => a.localeCompare(b))) {
     const source = resolve(localProfileDirectory(), path);
-    if (!source.startsWith(localProfilePath(photoRoot)) || !existsSync(source)) throw new Error(`Assigned photo was not found: ${path}`);
+    if (!isInsideDirectory(localProfilePath(photoRoot), source) || !existsSync(source)) throw new Error(`Assigned photo was not found: ${path}`);
     const directory = localProfilePath(organizedRoot, reference.weekStarting);
     mkdirSync(directory, { recursive: true });
     let index = 1;
