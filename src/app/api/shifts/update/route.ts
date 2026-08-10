@@ -16,6 +16,7 @@ export async function POST(request: NextRequest) {
   try {
     const input = UpdateShiftSchema.parse(await request.json());
     const week = getWeekData(input.weekId);
+    if (week.id !== input.weekId) throw new Error("Week was not found.");
     const updatedWeek = applyShiftUpdate(week, input);
     writeWeekById(input.weekId, updatedWeek);
     const updatedShiftId = input.shiftId.startsWith("ocr-") ? `manual-${input.shiftId}` : input.shiftId;

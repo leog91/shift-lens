@@ -12,6 +12,7 @@ export async function POST(request: NextRequest) {
     requireLocalDataMode();
     const input = ConfirmRosterEstimateSchema.parse(await request.json());
     const week = getWeekData(input.weekId);
+    if (week.id !== input.weekId) throw new Error("Week was not found.");
     const estimate = (week.rosterEstimates ?? []).find((item) => item.id === input.estimateId);
     if (!estimate) throw new Error("Roster estimate was not found.");
     if (workedMinutes(estimate.startTime, estimate.finishTime, input.breakMinutes) == null) throw new Error("Break must be shorter than the shift duration.");

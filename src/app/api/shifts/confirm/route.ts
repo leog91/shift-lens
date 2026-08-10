@@ -10,6 +10,7 @@ export async function POST(request: NextRequest) {
   try {
     const { weekId, shiftId } = ConfirmShiftSchema.parse(await request.json());
     const week = getWeekData(weekId);
+    if (week.id !== weekId) throw new Error("Week was not found.");
     writeWeekById(weekId, applyShiftConfirmation(week, shiftId));
     return NextResponse.json({ ok: true });
   } catch (error) {
