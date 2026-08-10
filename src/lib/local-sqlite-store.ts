@@ -219,10 +219,32 @@ function deleteWeek(database: Database.Database, weekId: string) {
   database.prepare("DELETE FROM local_weeks WHERE id = ?").run(weekId);
 }
 
-function writeWeek(database: Database.Database, company: string, week: LocalWeek) {
-  deleteWeek(database, week.id);
+type ColumnValue = string | number | null;
+type Row = Record<string, ColumnValue>;
 
-  database.prepare("INSERT INTO local_weeks (id, company_id, week_starting, status) VALUES (?, ?, ?, ?)").run(week.id, company, week.weekStarting, week.status);
+// Rewriting every row of a week to change one field made each edit cost the
+// whole week. Replace only the rows that were added, removed, or altered.
+function syncWeekTable(database: Database.Database, weekId: string, table: string, keyColumn: string, rows: Row[]) {
+  const existing = database.prepare(`SELECT * FROM ${table} WHERE week_id = ?`).all(weekId) as Row[];
+  const incoming = new Map(rows.map((row) => [String(row[keyColumn]), row]));
+  const remove = database.prepare(`DELETE FROM ${table} WHERE week_id = ? AND ${keyColumn} = ?`);
+  for (const row of existing) {
+    const key = String(row[keyColumn]);
+    if (!incoming.has(key)) remove.run(weekId, key);
+  }
+  if (rows.length === 0) return;
+  const current = new Map(existing.map((row) => [String(row[keyColumn]), row]));
+  const columns = Object.keys(rows[0]);
+  const replace = database.prepare(`INSERT OR REPLACE INTO ${table} (${columns.join(", ")}) VALUES (${columns.map(() => "?").join(", ")})`);
+  for (const row of rows) {
+    const stored = current.get(String(row[keyColumn]));
+    if (stored && columns.every((column) => stored[column] === row[column])) continue;
+    replace.run(...columns.map((column) => row[column]));
+  }
+}
+
+function writeWeek(database: Database.Database, company: string, week: LocalWeek) {
+  database.prepare("INSERT INTO local_weeks (id, company_id, week_starting, status) VALUES (?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET company_id = excluded.company_id, week_starting = excluded.week_starting, status = excluded.status").run(week.id, company, week.weekStarting, week.status);
   const employee = database.prepare("INSERT INTO local_employees (id, company_id, display_name, active) VALUES (?, ?, ?, 1) ON CONFLICT(id) DO UPDATE SET display_name = excluded.display_name, company_id = excluded.company_id");
   const alias = database.prepare("INSERT OR IGNORE INTO local_employee_aliases (employee_id, alias) VALUES (?, ?)");
   for (const person of week.employees) {
@@ -230,20 +252,27 @@ function writeWeek(database: Database.Database, company: string, week: LocalWeek
     for (const value of person.aliases) alias.run(person.id, value);
   }
 
-  const document = database.prepare("INSERT INTO local_documents (id, week_id, document_type, document_date, filename, path, quality_warnings_json) VALUES (?, ?, ?, ?, ?, ?, ?)");
-  for (const item of week.documents) document.run(item.id, week.id, item.documentType, item.documentDate, item.filename, item.path, JSON.stringify(item.qualityWarnings));
-  const assignment = database.prepare("INSERT INTO local_photo_assignments (path, week_id, week_starting, document_type, document_date, note) VALUES (?, ?, ?, ?, ?, ?)");
-  for (const item of week.photoAssignments ?? []) assignment.run(item.path, week.id, item.weekStarting, item.documentType, item.documentDate, item.note);
-  const shift = database.prepare("INSERT INTO local_shifts (id, week_id, employee_id, employee_name, date, start_time, finish_time, break_minutes, status, source_document) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-  for (const item of week.shifts) shift.run(item.id, week.id, item.employeeId, item.employeeName, item.date, item.startTime, item.finishTime, item.breakMinutes, item.status, item.sourceDocument ?? null);
-  const rosterEstimate = database.prepare("INSERT INTO local_roster_estimates (id, week_id, employee_id, employee_name, date, start_time, finish_time, break_minutes, source_document, status, raw_finish_time, review_reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-  for (const item of week.rosterEstimates ?? []) rosterEstimate.run(item.id, week.id, item.employeeId, item.employeeName, item.date, item.startTime, item.finishTime, item.breakMinutes, item.sourceDocument, item.status, item.rawFinishTime, item.reviewReason);
-  const rosterAssignment = database.prepare("INSERT INTO local_roster_assignments (id, week_id, employee_id, employee_name, date, type, raw_value, source_document) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-  for (const item of week.rosterAssignments ?? []) rosterAssignment.run(item.id, week.id, item.employeeId, item.employeeName, item.date, item.type, item.rawValue, item.sourceDocument);
-  const payroll = database.prepare("INSERT INTO local_payroll_entries (week_id, employee_id, employee_name, ordinary_paid_minutes, sunday_paid_minutes, other_paid_minutes, displayed_total_paid_minutes) VALUES (?, ?, ?, ?, ?, ?, ?)");
-  for (const item of week.payroll) payroll.run(week.id, item.employeeId, item.employeeName, item.ordinaryPaidMinutes, item.sundayPaidMinutes, item.otherPaidMinutes, item.displayedTotalPaidMinutes);
-  const review = database.prepare("INSERT INTO local_review_items (id, week_id, employee_name, filename, document_path, review_type, raw, proposed, reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-  for (const item of week.reviewItems) review.run(item.id, week.id, item.employeeName, item.filename, item.documentPath ?? null, item.reviewType ?? null, item.raw, item.proposed, item.reason);
+  syncWeekTable(database, week.id, "local_documents", "id", week.documents.map((item) => ({
+    id: item.id, week_id: week.id, document_type: item.documentType, document_date: item.documentDate, filename: item.filename, path: item.path, quality_warnings_json: JSON.stringify(item.qualityWarnings)
+  })));
+  syncWeekTable(database, week.id, "local_photo_assignments", "path", (week.photoAssignments ?? []).map((item) => ({
+    path: item.path, week_id: week.id, week_starting: item.weekStarting, document_type: item.documentType, document_date: item.documentDate, note: item.note
+  })));
+  syncWeekTable(database, week.id, "local_shifts", "id", week.shifts.map((item) => ({
+    id: item.id, week_id: week.id, employee_id: item.employeeId, employee_name: item.employeeName, date: item.date, start_time: item.startTime, finish_time: item.finishTime, break_minutes: item.breakMinutes, status: item.status, source_document: item.sourceDocument ?? null
+  })));
+  syncWeekTable(database, week.id, "local_roster_estimates", "id", (week.rosterEstimates ?? []).map((item) => ({
+    id: item.id, week_id: week.id, employee_id: item.employeeId, employee_name: item.employeeName, date: item.date, start_time: item.startTime, finish_time: item.finishTime, break_minutes: item.breakMinutes, source_document: item.sourceDocument, status: item.status, raw_finish_time: item.rawFinishTime, review_reason: item.reviewReason
+  })));
+  syncWeekTable(database, week.id, "local_roster_assignments", "id", (week.rosterAssignments ?? []).map((item) => ({
+    id: item.id, week_id: week.id, employee_id: item.employeeId, employee_name: item.employeeName, date: item.date, type: item.type, raw_value: item.rawValue, source_document: item.sourceDocument
+  })));
+  syncWeekTable(database, week.id, "local_payroll_entries", "employee_id", week.payroll.map((item) => ({
+    week_id: week.id, employee_id: item.employeeId, employee_name: item.employeeName, ordinary_paid_minutes: item.ordinaryPaidMinutes, sunday_paid_minutes: item.sundayPaidMinutes, other_paid_minutes: item.otherPaidMinutes, displayed_total_paid_minutes: item.displayedTotalPaidMinutes
+  })));
+  syncWeekTable(database, week.id, "local_review_items", "id", week.reviewItems.map((item) => ({
+    id: item.id, week_id: week.id, employee_name: item.employeeName, filename: item.filename, document_path: item.documentPath ?? null, review_type: item.reviewType ?? null, raw: item.raw, proposed: item.proposed, reason: item.reason
+  })));
 }
 
 function migrateSnapshots(database: Database.Database) {
