@@ -34,6 +34,7 @@ describe("reconciliation domain", () => {
     const result = compareActualAndPaid([shift({ date: "2026-07-12", breakMinutes: 30 })], [payroll({ ordinaryPaidMinutes: 0, sundayPaidMinutes: 450, displayedTotalPaidMinutes: 450 })])[0];
     expect(result).toMatchObject({ actualTotalMinutes: 450, actualSundayMinutes: 450, actualWeekdayMinutes: 0, status: "matches" });
   });
+  test("payslip hours with impossible minutes need review", () => expect(parsePayslipHours("10:75").minutes).toBe(null));
   test("uncertain shift excluded from confirmed totals", () => expect(compareActualAndPaid([shift({ status: "uncertain" })], [payroll({})])[0].actualTotalMinutes).toBe(0));
   test("manually entered shift is included in confirmed totals", () => expect(compareActualAndPaid([shift({ status: "manually_entered", breakMinutes: 30 })], [payroll({ ordinaryPaidMinutes: 450, displayedTotalPaidMinutes: 450 })])[0]).toMatchObject({ actualTotalMinutes: 450, status: "matches" }));
   test("exact actual-versus-paid match", () => expect(compareActualAndPaid([shift({})], [payroll({})])[0].status).toBe("matches"));

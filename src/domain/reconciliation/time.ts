@@ -64,6 +64,7 @@ export function parsePayslipHours(raw: string): { minutes: number | null; review
   const value = raw.trim();
   if (/^\d{1,3}:\d{2}$/.test(value)) {
     const [h, m] = value.split(":").map(Number);
+    if (m > 59) return { minutes: null, reviewRequired: true, reason: "Unreadable payslip hour value." };
     return { minutes: h * 60 + m, reviewRequired: false, reason: null };
   }
   if (/^\d+(?:\.\d+)?$/.test(value)) {
