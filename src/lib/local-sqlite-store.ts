@@ -19,17 +19,29 @@ export function localDatabasePath() {
 }
 
 export async function backupLocalDatabase(destinationPath: string) {
-  const database = openDatabase();
-  try {
-    migrateLegacyJson(database);
-    migrateSnapshots(database);
-    await database.backup(destinationPath);
-  } finally {
-    database.close();
-  }
+  await openDatabase().backup(destinationPath);
+}
+
+// One handle per profile file. Opening, re-running every migration check, and
+// closing on each read made a page render cost one full open per query.
+let connection: { path: string; database: Database.Database } | null = null;
+
+export function closeLocalDatabase() {
+  connection?.database.close();
+  connection = null;
 }
 
 function openDatabase(path = localDatabasePath()) {
+  if (connection?.path === path && connection.database.open) return connection.database;
+  closeLocalDatabase();
+  const database = createDatabase(path);
+  migrateLegacyJson(database);
+  migrateSnapshots(database);
+  connection = { path, database };
+  return database;
+}
+
+function createDatabase(path: string) {
   mkdirSync(dirname(path), { recursive: true });
   const database = new Database(path);
   database.pragma("foreign_keys = ON");
@@ -200,15 +212,15 @@ function companyId(database: Database.Database) {
   return company.id;
 }
 
+const weekTables = ["local_documents", "local_photo_assignments", "local_shifts", "local_roster_estimates", "local_roster_assignments", "local_payroll_entries", "local_review_items"];
+
+function deleteWeek(database: Database.Database, weekId: string) {
+  for (const table of weekTables) database.prepare(`DELETE FROM ${table} WHERE week_id = ?`).run(weekId);
+  database.prepare("DELETE FROM local_weeks WHERE id = ?").run(weekId);
+}
+
 function writeWeek(database: Database.Database, company: string, week: LocalWeek) {
-  database.prepare("DELETE FROM local_documents WHERE week_id = ?").run(week.id);
-  database.prepare("DELETE FROM local_photo_assignments WHERE week_id = ?").run(week.id);
-  database.prepare("DELETE FROM local_shifts WHERE week_id = ?").run(week.id);
-  database.prepare("DELETE FROM local_roster_estimates WHERE week_id = ?").run(week.id);
-  database.prepare("DELETE FROM local_roster_assignments WHERE week_id = ?").run(week.id);
-  database.prepare("DELETE FROM local_payroll_entries WHERE week_id = ?").run(week.id);
-  database.prepare("DELETE FROM local_review_items WHERE week_id = ?").run(week.id);
-  database.prepare("DELETE FROM local_weeks WHERE id = ?").run(week.id);
+  deleteWeek(database, week.id);
 
   database.prepare("INSERT INTO local_weeks (id, company_id, week_starting, status) VALUES (?, ?, ?, ?)").run(week.id, company, week.weekStarting, week.status);
   const employee = database.prepare("INSERT INTO local_employees (id, company_id, display_name, active) VALUES (?, ?, ?, 1) ON CONFLICT(id) DO UPDATE SET display_name = excluded.display_name, company_id = excluded.company_id");
@@ -263,21 +275,23 @@ function migrateLegacyJson(database: Database.Database) {
 function withDatabase<T>(operation: (database: Database.Database) => T) {
   const path = localDatabasePath();
   if (!existsSync(path) && !existsSync(localProfilePath("data", "local-week.json"))) return null;
-  const database = openDatabase(path);
-  try {
-    migrateLegacyJson(database);
-    migrateSnapshots(database);
-    return operation(database);
-  } finally {
-    database.close();
+  return operation(openDatabase(path));
+}
+
+function aliasesByEmployee(database: Database.Database) {
+  const aliases = new Map<string, string[]>();
+  for (const row of database.prepare("SELECT employee_id, alias FROM local_employee_aliases ORDER BY alias").all() as Array<{ employee_id: string; alias: string }>) {
+    aliases.set(row.employee_id, [...(aliases.get(row.employee_id) ?? []), row.alias]);
   }
+  return aliases;
 }
 
 function readWeek(database: Database.Database, row: WeekRow): LocalWeek {
+  const aliases = aliasesByEmployee(database);
   const employees = (database.prepare("SELECT DISTINCT e.id, e.display_name, e.active FROM local_employees e JOIN local_shifts s ON s.employee_id = e.id WHERE s.week_id = ? UNION SELECT DISTINCT e.id, e.display_name, e.active FROM local_employees e JOIN local_payroll_entries p ON p.employee_id = e.id WHERE p.week_id = ? UNION SELECT DISTINCT e.id, e.display_name, e.active FROM local_employees e WHERE e.company_id = ? ORDER BY display_name").all(row.id, row.id, companyId(database)) as EmployeeRow[]).map((employee) => ({
     id: employee.id,
     displayName: employee.display_name,
-    aliases: (database.prepare("SELECT alias FROM local_employee_aliases WHERE employee_id = ? ORDER BY alias").all(employee.id) as Array<{ alias: string }>).map((alias) => alias.alias)
+    aliases: aliases.get(employee.id) ?? []
   }));
   const documents = (database.prepare("SELECT id, document_type, document_date, filename, path, quality_warnings_json FROM local_documents WHERE week_id = ? ORDER BY document_date, filename").all(row.id) as DocumentRow[]).map((document) => ({
     id: document.id,
@@ -348,62 +362,35 @@ export function getLocalWeeks(): LocalWeek[] {
 
 export function writeLocalWeeks(weeks: LocalWeek[]) {
   const database = openDatabase();
-  try {
-    migrateLegacyJson(database);
-    migrateSnapshots(database);
-    const company = companyId(database);
-    const replace = database.transaction(() => {
-      const existing = database.prepare("SELECT id FROM local_weeks").all() as Array<{ id: string }>;
-      for (const row of existing) if (!weeks.some((week) => week.id === row.id)) {
-        database.prepare("DELETE FROM local_documents WHERE week_id = ?").run(row.id);
-        database.prepare("DELETE FROM local_photo_assignments WHERE week_id = ?").run(row.id);
-        database.prepare("DELETE FROM local_shifts WHERE week_id = ?").run(row.id);
-        database.prepare("DELETE FROM local_roster_estimates WHERE week_id = ?").run(row.id);
-        database.prepare("DELETE FROM local_roster_assignments WHERE week_id = ?").run(row.id);
-        database.prepare("DELETE FROM local_payroll_entries WHERE week_id = ?").run(row.id);
-        database.prepare("DELETE FROM local_review_items WHERE week_id = ?").run(row.id);
-        database.prepare("DELETE FROM local_weeks WHERE id = ?").run(row.id);
-      }
-      for (const week of weeks) writeWeek(database, company, week);
-    });
-    replace();
-  } finally {
-    database.close();
-  }
+  const company = companyId(database);
+  const replace = database.transaction(() => {
+    const existing = database.prepare("SELECT id FROM local_weeks").all() as Array<{ id: string }>;
+    for (const row of existing) if (!weeks.some((week) => week.id === row.id)) deleteWeek(database, row.id);
+    for (const week of weeks) writeWeek(database, company, week);
+  });
+  replace();
 }
 
 export function writeLocalWeek(week: LocalWeek) {
   const database = openDatabase();
-  try {
-    migrateLegacyJson(database);
-    migrateSnapshots(database);
-    const company = companyId(database);
-    database.transaction(() => writeWeek(database, company, week))();
-  } finally {
-    database.close();
-  }
+  const company = companyId(database);
+  database.transaction(() => writeWeek(database, company, week))();
 }
 
 export function createLocalEmployee(displayName: string, aliases: string[]) {
   const database = openDatabase();
-  try {
-    migrateLegacyJson(database);
-    migrateSnapshots(database);
-    const company = companyId(database);
-    const name = displayName.trim();
-    const existing = database.prepare("SELECT id FROM local_employees WHERE company_id = ? AND lower(display_name) = lower(?)").get(company, name) as { id: string } | undefined;
-    if (existing) throw new Error("An employee with this name already exists.");
-    const id = `employee-${randomUUID()}`;
-    const insert = database.transaction(() => {
-      database.prepare("INSERT INTO local_employees (id, company_id, display_name, active) VALUES (?, ?, ?, 1)").run(id, company, name);
-      const alias = database.prepare("INSERT OR IGNORE INTO local_employee_aliases (employee_id, alias) VALUES (?, ?)");
-      for (const value of aliases) alias.run(id, value);
-    });
-    insert();
-    return { id, displayName: name, aliases };
-  } finally {
-    database.close();
-  }
+  const company = companyId(database);
+  const name = displayName.trim();
+  const existing = database.prepare("SELECT id FROM local_employees WHERE company_id = ? AND lower(display_name) = lower(?)").get(company, name) as { id: string } | undefined;
+  if (existing) throw new Error("An employee with this name already exists.");
+  const id = `employee-${randomUUID()}`;
+  const insert = database.transaction(() => {
+    database.prepare("INSERT INTO local_employees (id, company_id, display_name, active) VALUES (?, ?, ?, 1)").run(id, company, name);
+    const alias = database.prepare("INSERT OR IGNORE INTO local_employee_aliases (employee_id, alias) VALUES (?, ?)");
+    for (const value of aliases) alias.run(id, value);
+  });
+  insert();
+  return { id, displayName: name, aliases };
 }
 
 export function getLocalSettingsValue() {

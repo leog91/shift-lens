@@ -3,7 +3,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, r
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { z } from "zod";
 import { requireLocalDataMode } from "./data-mode";
-import { backupLocalDatabase } from "./local-sqlite-store";
+import { backupLocalDatabase, closeLocalDatabase } from "./local-sqlite-store";
 import { localProfileDirectory, localProfilePath } from "./local-profile";
 
 const ManifestSchema = z.object({
@@ -135,6 +135,8 @@ export async function restoreProfileBackup(id: string) {
     if (existsSync(join(source, "photo-inbox"))) cpSync(join(source, "photo-inbox"), join(temporary, "photo-inbox"), { recursive: true });
     else mkdirSync(join(temporary, "photo-inbox"));
     if (existsSync(join(source, "profile.json"))) cpSync(join(source, "profile.json"), join(temporary, "profile.json"));
+    // The restore replaces the database file, so no handle may outlive the swap.
+    closeLocalDatabase();
     renameSync(localProfilePath("data"), oldData);
     renameSync(localProfilePath("photo-inbox"), oldPhotos);
     if (existsSync(localProfilePath("profile.json"))) renameSync(localProfilePath("profile.json"), oldProfile);
