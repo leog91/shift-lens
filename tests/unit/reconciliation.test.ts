@@ -28,6 +28,12 @@ describe("reconciliation domain", () => {
     expect(result.paidWeekdayMinutes).toBe(480);
     expect(result.paidSundayMinutes).toBe(240);
   });
+  test("Sunday minutes exclude the break", () => expect(sundayMinutes("2026-07-12", "09:00", "17:00", 30)).toBe(450));
+  test("a break spanning midnight is shared with the Sunday portion", () => expect(sundayMinutes("2026-07-11", "22:00", "02:00", 30)).toBe(105));
+  test("a Sunday shift with a break leaves no negative weekday remainder", () => {
+    const result = compareActualAndPaid([shift({ date: "2026-07-12", breakMinutes: 30 })], [payroll({ ordinaryPaidMinutes: 0, sundayPaidMinutes: 450, displayedTotalPaidMinutes: 450 })])[0];
+    expect(result).toMatchObject({ actualTotalMinutes: 450, actualSundayMinutes: 450, actualWeekdayMinutes: 0, status: "matches" });
+  });
   test("uncertain shift excluded from confirmed totals", () => expect(compareActualAndPaid([shift({ status: "uncertain" })], [payroll({})])[0].actualTotalMinutes).toBe(0));
   test("manually entered shift is included in confirmed totals", () => expect(compareActualAndPaid([shift({ status: "manually_entered", breakMinutes: 30 })], [payroll({ ordinaryPaidMinutes: 450, displayedTotalPaidMinutes: 450 })])[0]).toMatchObject({ actualTotalMinutes: 450, status: "matches" }));
   test("exact actual-versus-paid match", () => expect(compareActualAndPaid([shift({})], [payroll({})])[0].status).toBe("matches"));

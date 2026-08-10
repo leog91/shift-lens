@@ -21,10 +21,16 @@ export function splitShiftByDate(date: string, startTime: string, finishTime: st
   return result;
 }
 
-export function sundayMinutes(date: string, startTime: string, finishTime: string): number {
-  return Object.entries(splitShiftByDate(date, startTime, finishTime)).reduce((sum, [day, minutes]) => {
+export function sundayMinutes(date: string, startTime: string, finishTime: string, breakMinutes = 0): number {
+  const gross = Object.entries(splitShiftByDate(date, startTime, finishTime)).reduce((sum, [day, minutes]) => {
     return new Date(`${day}T00:00:00Z`).getUTCDay() === 0 ? sum + minutes : sum;
   }, 0);
+  const duration = shiftDurationMinutes(startTime, finishTime);
+  if (breakMinutes <= 0 || duration == null || duration <= 0) return gross;
+  // The paper sheet records one break for the whole shift, so each calendar day
+  // it covers carries its share. Otherwise a Sunday shift reports more Sunday
+  // minutes than it worked, and the Mon-Sat remainder turns negative.
+  return Math.round(gross * Math.max(0, duration - breakMinutes) / duration);
 }
 
 export function confirmedWorkedMinutes(shift: ShiftInput): number | null {
@@ -42,7 +48,7 @@ export function sumActualByEmployee(shifts: ShiftInput[]) {
       current.unresolved += 1;
     } else {
       current.total += minutes;
-      if (shift.startTime && shift.finishTime) current.sunday += sundayMinutes(shift.date, shift.startTime, shift.finishTime);
+      if (shift.startTime && shift.finishTime) current.sunday += sundayMinutes(shift.date, shift.startTime, shift.finishTime, shift.breakMinutes ?? 0);
     }
     totals.set(shift.employeeId, current);
   }
