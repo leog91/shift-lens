@@ -4,11 +4,11 @@ import { isLocalDataMode } from "@/lib/data-mode";
 
 export default async function ReviewPage({ params }: { params: Promise<{ weekId: string }> }) {
   const { weekId } = await params;
-  const { reviewItems } = getWeekData(weekId);
+  const week = getWeekData(weekId);
   return (
     <section className="space-y-4">
       <h1 className="text-3xl font-bold">Review queue</h1>
-      <ReviewQueueClient readOnly={!isLocalDataMode()} reviewItems={reviewItems} />
+      <ReviewQueueClient readOnly={!isLocalDataMode()} reviewItems={week.reviewItems} weekId={week.id} />
     </section>
   );
 }

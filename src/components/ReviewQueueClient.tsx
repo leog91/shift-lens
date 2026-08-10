@@ -14,7 +14,7 @@ interface ReviewItemView {
   reason: string;
 }
 
-export function ReviewQueueClient({ reviewItems, readOnly = false }: { reviewItems: ReviewItemView[]; readOnly?: boolean }) {
+export function ReviewQueueClient({ weekId, reviewItems, readOnly = false }: { weekId: string; reviewItems: ReviewItemView[]; readOnly?: boolean }) {
   const [items, setItems] = useState(reviewItems);
   const [values, setValues] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -26,7 +26,7 @@ export function ReviewQueueClient({ reviewItems, readOnly = false }: { reviewIte
       const response = await fetch("/api/review/confirm", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ reviewItemId: item.id, confirmedValue: values[item.id] ?? "" })
+        body: JSON.stringify({ weekId, reviewItemId: item.id, confirmedValue: values[item.id] ?? "" })
       });
       const result = await response.json() as { ok: boolean; error?: string };
       if (!response.ok || !result.ok) {
