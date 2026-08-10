@@ -1,3 +1,4 @@
+from hashlib import sha1
 from pathlib import Path
 import cv2
 import numpy as np
@@ -29,7 +30,10 @@ def preprocess_image(path: str) -> tuple[np.ndarray, dict]:
 
 
 def save_processed_preview(image: np.ndarray, original_path: str) -> str:
-    target = Path("extracted") / (Path(original_path).stem + "-processed.png")
+    source = Path(original_path)
+    # Two weeks can both hold a "sheet.jpg", so keep the source path in the name.
+    digest = sha1(str(source.resolve()).encode("utf-8")).hexdigest()[:10]
+    target = Path("extracted") / f"{source.stem}-{digest}-processed.png"
     target.parent.mkdir(parents=True, exist_ok=True)
     cv2.imwrite(str(target), image)
     return str(target)

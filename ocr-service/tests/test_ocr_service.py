@@ -5,7 +5,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.preprocessing import decode_image, preprocess_image
+from app.preprocessing import decode_image, preprocess_image, save_processed_preview
 from app.quality import quality_warnings
 from app.schemas import DailySheetResponse, TextDetection, BoundingBox
 from app.table_parser import group_columns, group_rows, parse_daily_rows, parse_roster_rows
@@ -116,6 +116,18 @@ def test_high_resolution_sheet_still_finds_its_columns():
     rows = parse_daily_rows(detections, [{"id": "victor", "displayName": "Victor", "aliases": []}])
     assert len(rows) == 1
     assert (rows[0].start.rawValue, rows[0].finish.rawValue) == ("16:00", "23:30")
+
+
+def test_processed_previews_do_not_overwrite_each_other(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    first = tmp_path / "july" / "sheet.jpg"
+    second = tmp_path / "august" / "sheet.jpg"
+    for path in (first, second):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        make_image(path)
+    image, _ = preprocess_image(str(first))
+    other, _ = preprocess_image(str(second))
+    assert save_processed_preview(image, str(first)) != save_processed_preview(other, str(second))
 
 
 def test_invalid_image_handling(tmp_path):
