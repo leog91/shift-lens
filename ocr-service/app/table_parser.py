@@ -290,10 +290,14 @@ def parse_roster_rows(detections: list[TextDetection], known_employees: list[dic
                 close = finish_raw.lower().startswith("cl")
                 finish = close_times.get(day_names[day_index], "") if close else clock(finish_raw)
                 if not close and finish <= start:
-                    # A bare finish such as "2 - 9" is an afternoon/evening
-                    # shift, not an overnight shift from 14:00 to 09:00.
                     finish_hour, finish_minute = map(int, finish.split(":"))
-                    finish = f"{finish_hour + 12:02d}:{finish_minute:02d}"
+                    # A bare morning finish such as "2 - 9" is an afternoon/evening
+                    # shift, not an overnight shift from 14:00 to 09:00. A finish
+                    # this rule already moved to PM ("3 - 1" is 15:00 to 01:00)
+                    # runs past midnight instead; moving it again would produce an
+                    # impossible hour such as 25:00 and silently drop the shift.
+                    finish_hour = finish_hour - 12 if finish_hour >= 13 else (finish_hour + 12) % 24
+                    finish = f"{finish_hour:02d}:{finish_minute:02d}"
                 if not finish:
                     continue
                 reasons = ["Roster OCR proposal requires review before it is treated as an estimate. The break defaults to 0 minutes and can be edited before confirmation."]
@@ -305,6 +309,8 @@ def parse_roster_rows(detections: list[TextDetection], known_employees: list[dic
                     reasons.append("Marked TR: training roster assignment.")
                 if close:
                     reasons.append(f"CLOSE was interpreted using the configured {finish} close time.")
+                if finish < start:
+                    reasons.append("This shift was read as finishing after midnight.")
                 if fuzzy:
                     reasons.append("Employee name was matched approximately from OCR text.")
                 rows.append(DailyRow.model_validate({

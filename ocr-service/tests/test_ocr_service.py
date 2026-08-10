@@ -88,6 +88,20 @@ def test_roster_parser_keeps_coloured_row_shifts_and_stock_assignment():
     assert rows[-1].assignmentType == "stock"
 
 
+def test_roster_parser_reads_a_finish_after_midnight():
+    detections = [
+        TextDetection(text=day, boundingBox=BoundingBox(x=index * 100, y=10, width=30, height=10))
+        for index, day in enumerate(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"])
+    ] + [
+        TextDetection(text="Leo", boundingBox=BoundingBox(x=10, y=100, width=30, height=10)),
+        TextDetection(text="3 - 1", boundingBox=BoundingBox(x=100, y=100, width=50, height=10)),
+        TextDetection(text="2 - 9", boundingBox=BoundingBox(x=200, y=100, width=50, height=10)),
+    ]
+    rows = parse_roster_rows(detections, [{"id": "leo", "displayName": "Leo", "aliases": []}], "2026-07-27", {})
+    assert [(row.start.normalisedValue, row.finish.normalisedValue) for row in rows] == [("15:00", "01:00"), ("14:00", "21:00")]
+    assert "This shift was read as finishing after midnight." in rows[0].reviewReasons
+
+
 def test_invalid_image_handling(tmp_path):
     path = tmp_path / "bad.jpg"
     path.write_text("not an image")
