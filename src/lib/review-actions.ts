@@ -23,7 +23,9 @@ export function applyReviewConfirmation(week: LocalWeek, reviewItemId: string, c
     if (breakMinutes < 0) throw new Error("Break cannot be negative.");
     return {
       ...week,
-      shifts: week.shifts.map((shift) => shift.sourceDocument === item.filename ? { ...shift, breakMinutes, status: "confirmed" as const } : shift),
+      // A confirmed break belongs to one person's row. It is not a confirmation
+      // of the row itself, so the status stays until that row is confirmed.
+      shifts: week.shifts.map((shift) => shift.sourceDocument === item.filename && shift.employeeName === item.employeeName ? { ...shift, breakMinutes } : shift),
       reviewItems: week.reviewItems.filter((reviewItem) => reviewItem.id !== reviewItemId)
     };
   }
