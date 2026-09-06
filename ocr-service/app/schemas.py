@@ -31,6 +31,7 @@ class DailyRow(BaseModel):
     matchedEmployeeId: str | None = None
     matchedEmployeeName: str | None = None
     employeeMatchConfidence: float | None = None
+    employeeBoundingBox: BoundingBox | None = None
     start: ExtractedValue | None
     finish: ExtractedValue | None
     break_: ExtractedValue | None = Field(default=None, alias="break")
@@ -51,6 +52,8 @@ class DailySheetResponse(BaseModel):
     documentType: Literal["daily_sheet"] = "daily_sheet"
     date: str | None = None
     providerName: str = "paddle-ocr"
+    imageWidth: int | None = None
+    imageHeight: int | None = None
     processedImagePath: str | None = None
     qualityWarnings: list[str]
     detectedText: list[TextDetection]

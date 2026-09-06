@@ -4,6 +4,7 @@ import { DailySheetExtractionSchema } from "@/extraction/schemas";
 import { applyShiftUpdate } from "@/lib/shift-update-actions";
 import { relinkPhotoPaths } from "@/lib/photo-organizer";
 import { applyPhotoDocumentAssignment } from "@/lib/photo-actions";
+import { applyShiftDismissal, applyShiftRestore } from "@/lib/shift-review-actions";
 
 const shift = (overrides: Partial<ShiftInput>): ShiftInput => ({ id: "s", employeeId: "e", employeeName: "Employee", date: "2026-07-06", startTime: "09:00", finishTime: "17:00", breakMinutes: 0, status: "confirmed", ...overrides });
 const payroll = (overrides: Partial<PayrollInput>): PayrollInput => ({ employeeId: "e", employeeName: "Employee", ordinaryPaidMinutes: 480, sundayPaidMinutes: 0, otherPaidMinutes: 0, displayedTotalPaidMinutes: 480, ...overrides });
@@ -60,6 +61,28 @@ describe("reconciliation domain", () => {
     }, { shiftId: "ocr-doc-employee", startTime: "09:00", finishTime: "17:00", breakMinutes: 0 });
     expect(updated.shifts[0]).toMatchObject({ id: "manual-ocr-doc-employee", status: "uncertain" });
   });
+  test("clearing corrected times keeps the row out of confirmed totals", () => {
+    const week = {
+      id: "week", weekStarting: "2026-07-06", status: "open", documents: [],
+      photoAssignments: [], employees: [], shifts: [shift({})], payroll: [], reviewItems: []
+    };
+    const updated = applyShiftUpdate(week, { shiftId: "s", startTime: null, finishTime: null, breakMinutes: null });
+    expect(updated.shifts[0]).toMatchObject({ startTime: null, finishTime: null, breakMinutes: null, status: "uncertain" });
+    expect(compareActualAndPaid(updated.shifts, [payroll({})])[0].actualTotalMinutes).toBe(0);
+    expect(week.shifts[0].status).toBe("confirmed");
+  });
+  test("corrections reject impossible clock values and fractional breaks", () => {
+    const week = {
+      id: "week", weekStarting: "2026-07-06", status: "open", documents: [],
+      photoAssignments: [], employees: [], shifts: [shift({})], payroll: [], reviewItems: []
+    };
+    const input = { shiftId: "s", startTime: "09:00", finishTime: "17:00", breakMinutes: 0 };
+    for (const time of ["24:00", "09:60", "99:99", ""]) {
+      expect(() => applyShiftUpdate(week, { ...input, startTime: time })).toThrow("Start time must use HH:mm.");
+      expect(() => applyShiftUpdate(week, { ...input, finishTime: time })).toThrow("Finish time must use HH:mm.");
+    }
+    expect(() => applyShiftUpdate(week, { ...input, breakMinutes: 0.5 })).toThrow("integer");
+  });
   test("organizing originals relinks documents and OCR source names", () => {
     const updated = relinkPhotoPaths({
       id: "week",
@@ -84,5 +107,17 @@ describe("reconciliation domain", () => {
   test("duplicate-shift detection", () => expect(detectDuplicateShifts([shift({ id: "a" }), shift({ id: "b" })])).toHaveLength(1));
   test("reconciliation-status assignment", () => expect(compareActualAndPaid([shift({ status: "uncertain" })], [payroll({})])[0].status).toBe("needs_review"));
   test("extraction-response Zod validation", () => expect(DailySheetExtractionSchema.parse({ documentType: "daily_sheet", date: null, providerName: "test", qualityWarnings: [], detectedText: [], rows: [], unresolvedFields: [] }).documentType).toBe("daily_sheet"));
+  test("dismissal is reversible and never enters confirmed totals", () => {
+    const week = { id: "week", weekStarting: "2026-07-06", status: "open", documents: [], photoAssignments: [], employees: [], shifts: [shift({ status: "uncertain" })], payroll: [], reviewItems: [] };
+    const dismissed = applyShiftDismissal(week, "s", "incorrect_ocr_row");
+    expect(dismissed.shifts[0]).toMatchObject({ status: "dismissed", dismissal: { reason: "incorrect_ocr_row" } });
+    expect(compareActualAndPaid(dismissed.shifts, [payroll({})])[0].actualTotalMinutes).toBe(0);
+    expect(applyShiftRestore(dismissed, "s").shifts[0]).toMatchObject({ status: "uncertain", dismissal: null });
+  });
+  test("correction history retains original extraction separately", () => {
+    const updated = applyShiftUpdate({ id: "week", weekStarting: "2026-07-06", status: "open", documents: [], photoAssignments: [], employees: [], shifts: [shift({ id: "ocr-row", status: "uncertain", extraction: null })], payroll: [], reviewItems: [] }, { shiftId: "ocr-row", startTime: "10:00", finishTime: "18:00", breakMinutes: 30, correctionReason: "Reviewer checked the paper" });
+    expect(updated.shifts[0].extraction).toBeNull();
+    expect(updated.shifts[0].corrections?.[0]).toMatchObject({ previousValue: { startTime: "09:00" }, newValue: { startTime: "10:00" }, reason: "Reviewer checked the paper", reviewer: null });
+  });
   test("shift duration raw overnight", () => expect(shiftDurationMinutes("23:00", "01:00")).toBe(120));
 });

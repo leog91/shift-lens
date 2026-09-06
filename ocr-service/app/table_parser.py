@@ -169,7 +169,9 @@ def parse_daily_rows(detections: list[TextDetection], known_employees: list[dict
             employee, fuzzy_match = match_employee_name(item.text, matches)
             if not employee:
                 continue
-            row = [candidate for candidate in detections if candidate.boundingBox and abs(detection_y(candidate) - detection_y(item)) <= 28 * scale]
+            # Associate cells with the same detected table row. A broad global
+            # y-window lets a tilted photo borrow a neighbour's times.
+            row = next((candidate_row for candidate_row in group_rows(detections, tolerance=28 * scale) if item in candidate_row), [item])
             start = nearest_cell(row, header_x["start"], scale)
             finish = nearest_cell(row, header_x["finish"], scale)
             break_value = nearest_cell(row, header_x["break"], scale)
@@ -190,11 +192,12 @@ def parse_daily_rows(detections: list[TextDetection], known_employees: list[dict
             if not start or not finish:
                 reasons.append("Required row field could not be read confidently.")
             parsed.append(DailyRow.model_validate({
-                "rowIndex": len(parsed),
+                "rowIndex": next((index for index, candidate_row in enumerate(group_rows(detections, tolerance=28 * scale)) if item in candidate_row), len(parsed)),
                 "rawEmployeeName": item.text,
                 "matchedEmployeeId": employee.get("id"),
                 "matchedEmployeeName": employee.get("displayName"),
                 "employeeMatchConfidence": item.confidence,
+                "employeeBoundingBox": item.boundingBox,
                 "start": start,
                 "finish": finish,
                 "break": break_value,
@@ -213,7 +216,7 @@ def parse_daily_rows(detections: list[TextDetection], known_employees: list[dict
         reasons = []
         if not employee or not start or not finish:
             reasons.append("Required row field could not be read confidently.")
-        parsed.append(DailyRow.model_validate({"rowIndex": index, "rawEmployeeName": employee, "start": start, "finish": finish, "break": break_value, "reviewRequired": bool(reasons), "reviewReasons": reasons}))
+        parsed.append(DailyRow.model_validate({"rowIndex": index, "rawEmployeeName": employee, "start": start, "finish": finish, "break": break_value, "reviewRequired": True, "reviewReasons": reasons + ["OCR proposals require review before counting."]}))
     return parsed
 
 

@@ -9,7 +9,8 @@ const UpdateShiftSchema = z.object({
   shiftId: z.string(),
   startTime: z.string().nullable(),
   finishTime: z.string().nullable(),
-  breakMinutes: z.number().int().nullable()
+  breakMinutes: z.number().int().nullable(),
+  correctionReason: z.string().trim().max(500).optional()
 });
 
 export async function POST(request: NextRequest) {
@@ -20,7 +21,7 @@ export async function POST(request: NextRequest) {
     const updatedWeek = applyShiftUpdate(week, input);
     writeWeekById(input.weekId, updatedWeek);
     const updatedShiftId = input.shiftId.startsWith("ocr-") ? `manual-${input.shiftId}` : input.shiftId;
-    return NextResponse.json({ ok: true, shiftId: updatedShiftId });
+    return NextResponse.json({ ok: true, shiftId: updatedShiftId, shift: updatedWeek.shifts.find((shift) => shift.id === updatedShiftId) });
   } catch (error) {
     return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : "Unable to update shift." }, { status: 400 });
   }

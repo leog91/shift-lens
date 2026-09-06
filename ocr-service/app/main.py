@@ -36,7 +36,7 @@ def extract_daily_sheet(request: ExtractionRequest):
     unresolved = [reason for row in rows for reason in row.reviewReasons]
     if not rows:
         unresolved.append("No table rows detected; manual review required.")
-    return DailySheetResponse(date=request.expectedDate, processedImagePath=processed_path, qualityWarnings=metadata["qualityWarnings"], detectedText=detections, rows=rows, unresolvedFields=unresolved)
+    return DailySheetResponse(imageWidth=metadata["width"], imageHeight=metadata["height"], date=request.expectedDate, processedImagePath=processed_path, qualityWarnings=metadata["qualityWarnings"], detectedText=detections, rows=rows, unresolvedFields=unresolved)
 
 
 @app.post("/extract/roster", response_model=RosterResponse)

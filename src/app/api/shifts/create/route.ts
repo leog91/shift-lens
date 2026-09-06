@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+import { belongsToDocument } from "@/lib/merge-ocr-shifts";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { writeWeekById } from "@/lib/local-week-store";
@@ -25,14 +27,12 @@ export async function POST(request: NextRequest) {
     if (!employee) throw new Error("Employee was not found.");
     if (input.startTime && !timePattern.test(input.startTime)) throw new Error("Start time must use HH:mm.");
     if (input.finishTime && !timePattern.test(input.finishTime)) throw new Error("Finish time must use HH:mm.");
-    if (week.shifts.some((shift) => shift.sourceDocument === document.filename && shift.employeeId === employee.id)) {
+    if (week.shifts.some((shift) => belongsToDocument(shift, document) && shift.employeeId === employee.id && shift.status !== "dismissed")) {
       throw new Error("This employee already has a row on this page.");
     }
 
-    writeWeekById(input.weekId, {
-      ...week,
-      shifts: [...week.shifts, {
-        id: `manual-${document.id}-${employee.id}`,
+    const shift: (typeof week.shifts)[number] = {
+        id: `manual-${randomUUID()}`,
         employeeId: employee.id,
         employeeName: employee.displayName,
         date: document.documentDate ?? week.weekStarting,
@@ -40,10 +40,11 @@ export async function POST(request: NextRequest) {
         finishTime: input.finishTime,
         breakMinutes: input.breakMinutes,
         status: "uncertain",
+        sourceDocumentId: document.id,
         sourceDocument: document.filename
-      }]
-    });
-    return NextResponse.json({ ok: true });
+      };
+    writeWeekById(input.weekId, { ...week, shifts: [...week.shifts, shift] });
+    return NextResponse.json({ ok: true, shift });
   } catch (error) {
     return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : "Unable to add row." }, { status: 400 });
   }

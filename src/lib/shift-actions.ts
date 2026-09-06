@@ -4,6 +4,7 @@ import type { LocalWeek } from "./week-data";
 export function applyShiftConfirmation(week: LocalWeek, shiftId: string): LocalWeek {
   const shift = week.shifts.find((item) => item.id === shiftId);
   if (!shift) throw new Error("Shift was not found.");
+  if (shift.status === "dismissed") throw new Error("Dismissed rows must be restored before confirmation.");
   if (!shift.startTime || !shift.finishTime || shift.breakMinutes == null) {
     throw new Error("Start, finish, and break must be present before confirming this row.");
   }
@@ -12,6 +13,6 @@ export function applyShiftConfirmation(week: LocalWeek, shiftId: string): LocalW
   }
   return {
     ...week,
-    shifts: week.shifts.map((item) => item.id === shiftId ? { ...item, status: "confirmed" as const } : item)
+    shifts: week.shifts.map((item) => item.id === shiftId ? { ...item, status: "confirmed" as const, uncertainFields: [] } : item)
   };
 }

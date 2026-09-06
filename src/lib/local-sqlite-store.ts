@@ -8,7 +8,7 @@ import { localProfilePath } from "./local-profile";
 type WeekRow = { id: string; week_starting: string; status: string };
 type EmployeeRow = { id: string; display_name: string; active: number };
 type DocumentRow = { id: string; document_type: LocalWeek["documents"][number]["documentType"]; document_date: string | null; filename: string; path: string; quality_warnings_json: string };
-type ShiftRow = { id: string; employee_id: string; employee_name: string; date: string; start_time: string | null; finish_time: string | null; break_minutes: number | null; status: LocalWeek["shifts"][number]["status"]; source_document: string | null };
+type ShiftRow = { id: string; employee_id: string; employee_name: string; date: string; start_time: string | null; finish_time: string | null; break_minutes: number | null; status: LocalWeek["shifts"][number]["status"]; source_document: string | null; source_document_id: string | null; source_row_id: string | null; uncertain_fields_json: string; extraction_json: string | null; corrections_json: string; dismissal_json: string | null; review_history_json: string };
 type RosterEstimateRow = { id: string; employee_id: string; employee_name: string; date: string; start_time: string; finish_time: string; break_minutes: number | null; source_document: string | null; status: "extracted" | "confirmed" | "manually_entered"; raw_finish_time: string | null; review_reason: string | null };
 type RosterAssignmentRow = { id: string; employee_id: string; employee_name: string; date: string; type: "standby" | "office" | "stock"; raw_value: string; source_document: string };
 type PayrollRow = { employee_id: string; employee_name: string; ordinary_paid_minutes: number; sunday_paid_minutes: number; other_paid_minutes: number; displayed_total_paid_minutes: number | null };
@@ -99,7 +99,14 @@ function createDatabase(path: string) {
       finish_time TEXT,
       break_minutes INTEGER,
       status TEXT NOT NULL,
-      source_document TEXT
+      source_document TEXT,
+      source_document_id TEXT,
+      source_row_id TEXT,
+      uncertain_fields_json TEXT NOT NULL DEFAULT '[]',
+      extraction_json TEXT,
+      corrections_json TEXT NOT NULL DEFAULT '[]',
+      review_history_json TEXT NOT NULL DEFAULT '[]',
+      dismissal_json TEXT
     );
     CREATE TABLE IF NOT EXISTS local_roster_estimates (
       id TEXT PRIMARY KEY NOT NULL,
@@ -152,6 +159,16 @@ function createDatabase(path: string) {
       payload_json TEXT NOT NULL
     );
   `);
+  const shiftColumns = database.prepare("PRAGMA table_info(local_shifts)").all() as Array<{ name: string }>;
+  const addShiftColumn = (name: string, definition: string) => { if (!shiftColumns.some((column) => column.name === name)) database.exec(`ALTER TABLE local_shifts ADD COLUMN ${name} ${definition}`); };
+  addShiftColumn("source_document_id", "TEXT");
+  addShiftColumn("source_row_id", "TEXT");
+  addShiftColumn("uncertain_fields_json", "TEXT NOT NULL DEFAULT '[]'");
+  addShiftColumn("extraction_json", "TEXT");
+  addShiftColumn("corrections_json", "TEXT NOT NULL DEFAULT '[]'");
+  addShiftColumn("dismissal_json", "TEXT");
+  addShiftColumn("review_history_json", "TEXT NOT NULL DEFAULT '[]'");
+  database.prepare("UPDATE companies SET schema_version = MAX(schema_version, 3)").run();
   const rosterEstimateColumns = database.prepare("PRAGMA table_info(local_roster_estimates)").all() as Array<{ name: string }>;
   const breakColumn = rosterEstimateColumns.find((column) => column.name === "break_minutes") as { name: string; notnull?: number } | undefined;
   if (breakColumn?.notnull || !rosterEstimateColumns.some((column) => column.name === "status")) {
@@ -259,7 +276,7 @@ function writeWeek(database: Database.Database, company: string, week: LocalWeek
     path: item.path, week_id: week.id, week_starting: item.weekStarting, document_type: item.documentType, document_date: item.documentDate, note: item.note
   })));
   syncWeekTable(database, week.id, "local_shifts", "id", week.shifts.map((item) => ({
-    id: item.id, week_id: week.id, employee_id: item.employeeId, employee_name: item.employeeName, date: item.date, start_time: item.startTime, finish_time: item.finishTime, break_minutes: item.breakMinutes, status: item.status, source_document: item.sourceDocument ?? null
+    id: item.id, week_id: week.id, employee_id: item.employeeId, employee_name: item.employeeName, date: item.date, start_time: item.startTime, finish_time: item.finishTime, break_minutes: item.breakMinutes, status: item.status, source_document: item.sourceDocument ?? null, source_document_id: item.sourceDocumentId ?? null, source_row_id: item.sourceRowId ?? null, uncertain_fields_json: JSON.stringify(item.uncertainFields ?? []), extraction_json: item.extraction ? JSON.stringify(item.extraction) : null, corrections_json: JSON.stringify(item.corrections ?? []), dismissal_json: item.dismissal ? JSON.stringify(item.dismissal) : null, review_history_json: JSON.stringify(item.reviewHistory ?? [])
   })));
   syncWeekTable(database, week.id, "local_roster_estimates", "id", (week.rosterEstimates ?? []).map((item) => ({
     id: item.id, week_id: week.id, employee_id: item.employeeId, employee_name: item.employeeName, date: item.date, start_time: item.startTime, finish_time: item.finishTime, break_minutes: item.breakMinutes, source_document: item.sourceDocument, status: item.status, raw_finish_time: item.rawFinishTime, review_reason: item.reviewReason
@@ -337,7 +354,7 @@ function readWeek(database: Database.Database, row: WeekRow): LocalWeek {
     documentDate: assignment.document_date,
     note: assignment.note
   }));
-  const shifts = (database.prepare("SELECT id, employee_id, employee_name, date, start_time, finish_time, break_minutes, status, source_document FROM local_shifts WHERE week_id = ? ORDER BY date, employee_name").all(row.id) as ShiftRow[]).map((shift) => ({
+  const shifts = (database.prepare("SELECT id, employee_id, employee_name, date, start_time, finish_time, break_minutes, status, source_document, source_document_id, source_row_id, uncertain_fields_json, extraction_json, corrections_json, dismissal_json, review_history_json FROM local_shifts WHERE week_id = ? ORDER BY date, employee_name").all(row.id) as ShiftRow[]).map((shift) => ({
     id: shift.id,
     employeeId: shift.employee_id,
     employeeName: shift.employee_name,
@@ -346,7 +363,14 @@ function readWeek(database: Database.Database, row: WeekRow): LocalWeek {
     finishTime: shift.finish_time,
     breakMinutes: shift.break_minutes,
     status: shift.status,
-    sourceDocument: shift.source_document
+    sourceDocument: shift.source_document,
+    sourceDocumentId: shift.source_document_id,
+    sourceRowId: shift.source_row_id,
+    uncertainFields: JSON.parse(shift.uncertain_fields_json || "[]"),
+    extraction: shift.extraction_json ? JSON.parse(shift.extraction_json) : null,
+    corrections: JSON.parse(shift.corrections_json || "[]"),
+    reviewHistory: JSON.parse(shift.review_history_json || "[]"),
+    dismissal: shift.dismissal_json ? JSON.parse(shift.dismissal_json) : null
   }));
   const rosterEstimates = (database.prepare("SELECT id, employee_id, employee_name, date, start_time, finish_time, break_minutes, source_document, status, raw_finish_time, review_reason FROM local_roster_estimates WHERE week_id = ? ORDER BY date, employee_name").all(row.id) as RosterEstimateRow[]).map((estimate) => ({
     id: estimate.id,

@@ -11,8 +11,9 @@ export async function POST(request: NextRequest) {
     const { weekId, shiftId } = ConfirmShiftSchema.parse(await request.json());
     const week = getWeekData(weekId);
     if (week.id !== weekId) throw new Error("Week was not found.");
-    writeWeekById(weekId, applyShiftConfirmation(week, shiftId));
-    return NextResponse.json({ ok: true });
+    const updated = applyShiftConfirmation(week, shiftId);
+    writeWeekById(weekId, updated);
+    return NextResponse.json({ ok: true, shift: updated.shifts.find((item) => item.id === shiftId) });
   } catch (error) {
     return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : "Unable to confirm shift." }, { status: 400 });
   }

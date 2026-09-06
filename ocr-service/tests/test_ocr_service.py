@@ -70,6 +70,20 @@ def test_fuzzy_employee_label_creates_partial_review_row():
     assert "Employee name was matched approximately from OCR text." in rows[0].reviewReasons
 
 
+def test_neighbouring_rows_do_not_share_time_cells():
+    detections = [
+        TextDetection(text="Ana", confidence=0.9, boundingBox=BoundingBox(x=10, y=50, width=40, height=10)),
+        TextDetection(text="Ben", confidence=0.9, boundingBox=BoundingBox(x=10, y=90, width=40, height=10)),
+        TextDetection(text="09:00", boundingBox=BoundingBox(x=100, y=50, width=40, height=10)),
+        TextDetection(text="17:00", boundingBox=BoundingBox(x=200, y=90, width=40, height=10)),
+    ]
+    rows = parse_daily_rows(detections, [
+        {"id": "ana", "displayName": "Ana", "aliases": []},
+        {"id": "ben", "displayName": "Ben", "aliases": []},
+    ])
+    assert [(row.matchedEmployeeId, row.start.rawValue if row.start else None, row.finish.rawValue if row.finish else None) for row in rows] == [("ana", "09:00", None), ("ben", None, "17:00")]
+
+
 def test_roster_parser_keeps_coloured_row_shifts_and_stock_assignment():
     detections = [
         TextDetection(text=day, boundingBox=BoundingBox(x=index * 100, y=10, width=30, height=10))

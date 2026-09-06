@@ -37,8 +37,20 @@ const LocalWeekSchema = z.object({
     startTime: z.string().nullable(),
     finishTime: z.string().nullable(),
     breakMinutes: z.number().int().nullable(),
-    status: z.enum(["extracted", "confirmed", "uncertain", "manually_entered"]),
-    sourceDocument: z.string().nullable().optional()
+    status: z.enum(["extracted", "confirmed", "uncertain", "manually_entered", "dismissed"]),
+    sourceDocument: z.string().nullable().optional(),
+    sourceDocumentId: z.string().nullable().optional(),
+    sourceRowId: z.string().nullable().optional(),
+    uncertainFields: z.array(z.string()).optional(),
+    extraction: z.object({
+      imageWidth: z.number().positive().nullable().optional(), imageHeight: z.number().positive().nullable().optional(),
+      providerName: z.string(), extractedAt: z.string(), rawEmployeeName: z.string().nullable(), rawDate: z.string().nullable(), rawStartTime: z.string().nullable(), rawFinishTime: z.string().nullable(), rawBreak: z.string().nullable(),
+      confidences: z.object({ employee: z.number().nullable(), start: z.number().nullable(), finish: z.number().nullable(), break: z.number().nullable() }),
+      coordinates: z.object({ employee: z.object({ x: z.number(), y: z.number(), width: z.number(), height: z.number() }).nullable(), start: z.object({ x: z.number(), y: z.number(), width: z.number(), height: z.number() }).nullable(), finish: z.object({ x: z.number(), y: z.number(), width: z.number(), height: z.number() }).nullable(), break: z.object({ x: z.number(), y: z.number(), width: z.number(), height: z.number() }).nullable() })
+    }).nullable().optional(),
+    corrections: z.array(z.object({ previousValue: z.object({ startTime: z.string().nullable(), finishTime: z.string().nullable(), breakMinutes: z.number().int().nullable() }), newValue: z.object({ startTime: z.string().nullable(), finishTime: z.string().nullable(), breakMinutes: z.number().int().nullable() }), timestamp: z.string(), reason: z.string(), reviewer: z.string().nullable() })).optional(),
+    reviewHistory: z.array(z.object({ action: z.enum(["dismiss", "restore"]), reason: z.enum(["not_worked", "incorrect_ocr_row"]), timestamp: z.string(), reviewer: z.string().nullable() })).optional(),
+    dismissal: z.object({ reason: z.enum(["not_worked", "incorrect_ocr_row"]), timestamp: z.string(), reviewer: z.string().nullable() }).nullable().optional()
   })).default([]),
   rosterEstimates: z.array(z.object({
     id: z.string(),

@@ -1,3 +1,4 @@
+import { mergeOcrShifts } from "@/lib/merge-ocr-shifts";
 import { existsSync } from "node:fs";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
@@ -61,12 +62,11 @@ export async function POST(request: NextRequest) {
     const extractor = new PaddleOcrExtractor(ocrServiceUrl);
     const dailyDocuments = week.documents.filter((document) => document.documentType === "daily_sheet" && (documentId == null || document.id === documentId));
     if (documentId != null && dailyDocuments.length === 0) throw new Error("Daily sheet was not found.");
-    const scannedDocuments = new Set(dailyDocuments.map((document) => document.filename));
-    // Refresh only unconfirmed OCR output. Confirmed and manually corrected values are evidence, not OCR input.
-    const nextShifts = week.shifts.filter((shift) => !scannedDocuments.has(shift.sourceDocument ?? "") || !shift.id.startsWith("ocr-") || shift.status !== "uncertain");
+    const successful: Array<{ document: (typeof dailyDocuments)[number]; proposals: typeof week.shifts }> = [];
     const results: Array<{ filename: string; createdRows: number; error?: string }> = [];
 
     for (const document of dailyDocuments) {
+      if (!document.documentDate) { results.push({ filename: document.filename, createdRows: 0, error: "Assign and verify the paper date before extraction." }); continue; }
       const filePath = localProfilePath(/* turbopackIgnore: true */ document.path);
       if (!existsSync(filePath)) {
         results.push({ filename: document.filename, createdRows: 0, error: "Local photo file was not found." });
@@ -81,6 +81,7 @@ export async function POST(request: NextRequest) {
           knownEmployees,
           expectedColumnNames: ["Name", "Start", "Finish", "Break"]
         });
+        const proposals: typeof week.shifts = [];
         let createdRows = 0;
         for (const row of extraction.rows) {
           const candidate = row.matchedEmployeeId ? knownEmployees.find((employee) => employee.id === row.matchedEmployeeId) : knownEmployees.find((employee) => {
@@ -88,12 +89,13 @@ export async function POST(request: NextRequest) {
             return name === employee.displayName.toLowerCase() || employee.aliases.some((alias) => alias.toLowerCase() === name);
           });
           if (!candidate) continue;
-          if (nextShifts.some((shift) => shift.sourceDocument === document.filename && shift.employeeId === candidate.id)) continue;
+          const sourceRowId = String(row.rowIndex);
+          if (proposals.some((shift) => shift.employeeId === candidate.id)) continue;
           const startTime = normaliseTime(row.start?.normalisedValue ?? row.start?.rawValue);
           const finishTime = normaliseTime(row.finish?.normalisedValue ?? row.finish?.rawValue);
           // Printed blank template rows still have employee names. Do not add them.
           if (startTime == null && finishTime == null) continue;
-          nextShifts.push({
+          proposals.push({
             id: `ocr-${document.id}-${candidate.id}`,
             employeeId: candidate.id,
             employeeName: candidate.displayName,
@@ -102,18 +104,53 @@ export async function POST(request: NextRequest) {
             finishTime,
             breakMinutes: row.break?.minutes ?? null,
             status: "uncertain",
-            sourceDocument: document.filename
+            sourceDocument: document.filename,
+            sourceDocumentId: document.id,
+            sourceRowId,
+            uncertainFields: [
+              ...(startTime == null || (row.start?.confidence == null || row.start.confidence < 0.85) ? ["startTime"] : []),
+              ...(finishTime == null || (row.finish?.confidence == null || row.finish.confidence < 0.85) ? ["finishTime"] : []),
+              ...(row.break?.minutes == null || (row.break?.confidence == null || row.break.confidence < 0.85) ? ["breakMinutes"] : [])
+            ],
+            extraction: {
+              imageWidth: extraction.imageWidth ?? null,
+              imageHeight: extraction.imageHeight ?? null,
+              providerName: extraction.providerName,
+              extractedAt: new Date().toISOString(),
+              rawEmployeeName: row.rawEmployeeName,
+              rawDate: row.date ?? extraction.date,
+              rawStartTime: row.start?.rawValue ?? null,
+              rawFinishTime: row.finish?.rawValue ?? null,
+              rawBreak: row.break?.rawValue ?? null,
+              confidences: { employee: row.employeeMatchConfidence ?? null, start: row.start?.confidence ?? null, finish: row.finish?.confidence ?? null, break: row.break?.confidence ?? null },
+              coordinates: { employee: row.employeeBoundingBox ?? null, start: row.start?.boundingBox ?? null, finish: row.finish?.boundingBox ?? null, break: row.break?.boundingBox ?? null }
+            },
+            corrections: [],
+            dismissal: null
           });
           createdRows += 1;
         }
+        successful.push({ document, proposals });
         results.push({ filename: document.filename, createdRows });
       } catch (error) {
         results.push({ filename: document.filename, createdRows: 0, error: error instanceof Error ? error.message : "OCR extraction failed." });
       }
     }
 
-    writeWeekById(weekId, { ...week, shifts: nextShifts });
-    return NextResponse.json({ ok: true, processedDocuments: dailyDocuments.length, results });
+    // Re-read after the slow OCR calls. Edits made while extraction runs win.
+    const latest = getWeekData(weekId);
+    if (latest.id !== weekId) throw new Error("Week was not found.");
+    let nextShifts = latest.shifts;
+    for (const { document, proposals } of successful) {
+      const liveDocument = latest.documents.find((item) => item.id === document.id && item.documentType === "daily_sheet");
+      if (!liveDocument || liveDocument.documentDate !== document.documentDate || liveDocument.path !== document.path) continue;
+      const previousIds = new Set(nextShifts.map((shift) => shift.id));
+      nextShifts = mergeOcrShifts(nextShifts, week.shifts, liveDocument, proposals);
+      const result = results.find((item) => item.filename === document.filename);
+      if (result) result.createdRows = nextShifts.filter((shift) => !previousIds.has(shift.id)).length;
+    }
+    writeWeekById(weekId, { ...latest, shifts: nextShifts });
+    return NextResponse.json({ ok: true, processedDocuments: dailyDocuments.length, results, shifts: nextShifts });
   } catch (error) {
     return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : "Unable to run batch extraction." }, { status: 400 });
   }
