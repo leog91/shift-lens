@@ -84,6 +84,26 @@ def test_neighbouring_rows_do_not_share_time_cells():
     assert [(row.matchedEmployeeId, row.start.rawValue if row.start else None, row.finish.rawValue if row.finish else None) for row in rows] == [("ana", "09:00", None), ("ben", None, "17:00")]
 
 
+def test_blank_row_does_not_borrow_times_from_nearest_named_row():
+    detections = [
+        TextDetection(text="Start", boundingBox=BoundingBox(x=100, y=10, width=40, height=10)),
+        TextDetection(text="Finish", boundingBox=BoundingBox(x=200, y=10, width=40, height=10)),
+        TextDetection(text="John", confidence=0.9, boundingBox=BoundingBox(x=10, y=50, width=40, height=10)),
+        TextDetection(text="Marcio", confidence=0.9, boundingBox=BoundingBox(x=10, y=72, width=50, height=10)),
+        TextDetection(text="08:45", boundingBox=BoundingBox(x=100, y=72, width=40, height=10)),
+        TextDetection(text="16:00", boundingBox=BoundingBox(x=200, y=72, width=40, height=10)),
+    ]
+    rows = parse_daily_rows(detections, [
+        {"id": "john", "displayName": "John", "aliases": []},
+        {"id": "marcio", "displayName": "Marcio", "aliases": []},
+    ])
+
+    assert [(row.matchedEmployeeId, row.start.rawValue if row.start else None, row.finish.rawValue if row.finish else None) for row in rows] == [
+        ("john", None, None),
+        ("marcio", "08:45", "16:00"),
+    ]
+
+
 def test_roster_parser_keeps_coloured_row_shifts_and_stock_assignment():
     detections = [
         TextDetection(text=day, boundingBox=BoundingBox(x=index * 100, y=10, width=30, height=10))

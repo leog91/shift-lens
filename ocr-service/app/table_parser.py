@@ -162,16 +162,31 @@ def parse_daily_rows(detections: list[TextDetection], known_employees: list[dict
         # Fallback for sheets where OCR merges "Start T & a Finish" into one block.
         cluster_start_x, cluster_finish_x = cluster_time_columns(detections, employee_names)
 
-        parsed: list[DailyRow] = []
+        employee_labels: list[tuple[TextDetection, dict, bool]] = []
         for item in detections:
             if not item.boundingBox:
                 continue
             employee, fuzzy_match = match_employee_name(item.text, matches)
-            if not employee:
-                continue
-            # Associate cells with the same detected table row. A broad global
-            # y-window lets a tilted photo borrow a neighbour's times.
-            row = next((candidate_row for candidate_row in group_rows(detections, tolerance=28 * scale) if item in candidate_row), [item])
+            if employee:
+                employee_labels.append((item, employee, fuzzy_match))
+        employee_labels.sort(key=lambda entry: detection_y(entry[0]))
+
+        parsed: list[DailyRow] = []
+        for row_index, (item, employee, fuzzy_match) in enumerate(employee_labels):
+            # A cell must be close to this label *and* closer to it than to any
+            # other detected employee label. This prevents a blank row from
+            # borrowing the next row's times while retaining enough tolerance
+            # for tilted and high-resolution phone photos.
+            row = [
+                candidate
+                for candidate in detections
+                if candidate.boundingBox
+                and abs(detection_y(candidate) - detection_y(item)) <= 28 * scale
+                and min(
+                    employee_labels,
+                    key=lambda entry: abs(detection_y(candidate) - detection_y(entry[0])),
+                )[0] is item
+            ]
             start = nearest_cell(row, header_x["start"], scale)
             finish = nearest_cell(row, header_x["finish"], scale)
             break_value = nearest_cell(row, header_x["break"], scale)
@@ -192,7 +207,7 @@ def parse_daily_rows(detections: list[TextDetection], known_employees: list[dict
             if not start or not finish:
                 reasons.append("Required row field could not be read confidently.")
             parsed.append(DailyRow.model_validate({
-                "rowIndex": next((index for index, candidate_row in enumerate(group_rows(detections, tolerance=28 * scale)) if item in candidate_row), len(parsed)),
+                "rowIndex": row_index,
                 "rawEmployeeName": item.text,
                 "matchedEmployeeId": employee.get("id"),
                 "matchedEmployeeName": employee.get("displayName"),
