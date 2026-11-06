@@ -5,7 +5,7 @@ const config = [
   ...nextVitals,
   ...nextTs,
   {
-    ignores: [".next/**", "node_modules/**", "ocr-service/**", "drizzle/**"]
+    ignores: [".next/**", "node_modules/**", "ocr-service/**", "drizzle/**", "extracted/**", "test-results/**", "playwright-report/**"]
   }
 ];
 

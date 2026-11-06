@@ -2,6 +2,8 @@ import { ReconciliationTable } from "@/components/ReconciliationTable";
 import { getWeekData } from "@/lib/week-data";
 import { WeekCoverage } from "@/components/WeekCoverage";
 import { getLocalSettings } from "@/lib/local-settings";
+import { WeekSheetGrid } from "@/components/WeeksCalendar";
+import { calendarDays } from "@/lib/week-calendar";
 
 export default async function WeekDashboard({ params }: { params: Promise<{ weekId: string }> }) {
   const { weekId } = await params;
@@ -22,6 +24,7 @@ export default async function WeekDashboard({ params }: { params: Promise<{ week
         <a className="dashboard-action" href={`/weeks/${weekId}/roster`}><strong>Roster context</strong><span>Reference only</span></a>
       </div>
       <WeekCoverage week={week} />
+      <WeekSheetGrid weekId={week.id} days={calendarDays(week)} />
       <ReconciliationTable shifts={week.shifts} payroll={week.payroll} openReviewCount={week.reviewItems.length} priorityEmployeeId={getLocalSettings().priorityEmployeeId} />
     </section>
   );

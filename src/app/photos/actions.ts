@@ -2,9 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync, mkdtempSync, rmSync } from "node:fs";
 import { basename, extname, join } from "node:path";
 import { z } from "zod";
+import { tmpdir } from "node:os";
+import { importPdf } from "@/lib/pdf-import";
 import { applyPhotoDocumentAssignment } from "@/lib/photo-actions";
 import { readLocalExtraWeeks, readLocalWeek, writeLocalExtraWeeks, writeLocalWeek } from "@/lib/local-week-store";
 import { manualReviewPhotoRoot } from "@/lib/photo-inbox";
@@ -63,15 +65,31 @@ function availablePath(directory: string, filename: string) {
 export async function uploadPhotos(formData: FormData) {
   requireLocalDataMode();
   const files = formData.getAll("photos").filter((value): value is File => value instanceof File && value.size > 0);
-  const accepted = files.filter((file) => supportedImageExtensions.has(extname(file.name).toLowerCase()) && file.size <= maxUploadBytes);
-  if (accepted.length === 0) redirect("/photos?uploadError=Choose+one+or+more+JPEG%2C+PNG%2C+or+WebP+images+under+20+MB.");
+  const accepted = files.filter((file) => (extname(file.name).toLowerCase() === ".pdf" ? file.size <= 100 * 1024 * 1024 : supportedImageExtensions.has(extname(file.name).toLowerCase()) && file.size <= maxUploadBytes));
+  if (accepted.length === 0) redirect("/photos?uploadError=Choose+JPEG%2C+PNG%2C+WebP+images+under+20+MB+or+PDFs+under+100+MB.");
 
   const directory = localProfilePath(manualReviewPhotoRoot);
   mkdirSync(directory, { recursive: true });
+  let pages = 0;
+  let failure: string | null = null;
   for (const file of accepted) {
-    writeFileSync(availablePath(directory, inboxFilename(file.name)), Buffer.from(await file.arrayBuffer()));
+    if (extname(file.name).toLowerCase() === ".pdf") {
+      const temporary = mkdtempSync(join(tmpdir(), "shiftlens-pdf-"));
+      try {
+        const path = join(temporary, inboxFilename(file.name));
+        writeFileSync(path, Buffer.from(await file.arrayBuffer()));
+        pages += (await importPdf(path)).pageCount;
+      } catch (error) {
+        failure = error instanceof Error ? error.message : "PDF import failed.";
+      } finally {
+        rmSync(temporary, { recursive: true, force: true });
+      }
+    } else {
+      writeFileSync(availablePath(directory, inboxFilename(file.name)), Buffer.from(await file.arrayBuffer()));
+      pages += 1;
+    }
   }
 
   revalidatePath("/photos");
-  redirect(`/photos?uploaded=${accepted.length}${accepted.length === files.length ? "" : `&skipped=${files.length - accepted.length}`}`);
+  redirect(`/photos?${failure ? `uploadError=${encodeURIComponent(failure)}&` : ""}uploaded=${pages}${accepted.length === files.length ? "" : `&skipped=${files.length - accepted.length}`}`);
 }

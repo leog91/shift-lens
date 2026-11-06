@@ -49,6 +49,16 @@ SHIFT_LENS_PROFILE_DIR=profiles/current-restaurant bun run
 9. Open the review queue and resolve ambiguous payroll or break values.
 10. Use `Comparison` only after the actual daily rows and payroll values are reviewed.
 
+## Browsing Weeks and Sheets
+
+On `/weeks`, switch between **List** and **Calendar**. The list keeps the full weekly overview. The calendar shows one month at a time, with Monday–Sunday rows and a link to each recorded week. Use the arrows or month picker to change months; the selected view and month are kept in the URL for bookmarking and sharing within your local app.
+
+The **Year** view adds a compact, spreadsheet-style overview of all twelve months. Each month contains recorded weeks in date order, their full date ranges, and daily-sheet coverage such as **6/7**. The month header shows complete weeks out of recorded weeks, such as **3/4**; it does not count unrecorded weeks as complete. Cross-month weeks appear once, under the month their Monday falls in. Click a week to open it, or a month heading to open its calendar. Use the year picker, previous/next arrows, or month jump links to navigate.
+
+Each day distinguishes a loaded sheet, a missing sheet in an existing week, or a day with no recorded week. Duplicate photos count as multiple sheets on the same day, not extra covered days. Loaded sheets are not necessarily confirmed hours; the small review count shows rows still needing checking. Days marked **No rows yet** have evidence but still need extraction or manual entry.
+
+Click a loaded day to open its paper with that date selected. Click a missing day to open the week's documents. Each week dashboard also includes a seven-day sheet grid. On smaller screens, scroll the grid horizontally to see all seven days. These views do not edit records or change confirmed totals.
+
 ## Assigning Photos
 
 Use `/photos` as an inbox for local images.

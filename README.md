@@ -178,6 +178,27 @@ Use `/weeks/<weekId>/documents` to preview and validate a local photo before ass
 
 Browser support for `capture` varies. Use the Photo inbox to select images from your computer; the app copies them into `photo-inbox/manual-review/` as unassigned files. Assign their date and type, then move the assigned files into categorized folders when ready.
 
+### Large PDF imports (local only)
+
+PDF uploads support up to 100 MB / 500 pages. Rendering is page-by-page with bounded image dimensions. Originals, page images and a manifest are retained together in a content-addressed inbox folder; reimporting resumes rather than duplicating pages. PDF pages remain in that folder when organizing photos so their original/page references stay valid.
+
+For a large import, use the command-line workflow to avoid holding the upload in the web server. Run these commands from the repository root, with the same `SHIFT_LENS_PROFILE_DIR` on every command if using a separate profile:
+
+```bash
+ocr-service/.venv/bin/python ocr-service/app/pdf_import.py /path/to/sheets.pdf photo-inbox/manual-review
+bun build scripts/import-pdf-hours.ts --target=node --packages=external --outfile=extracted/import-pdf-hours.mjs
+SHIFT_LENS_DATA_MODE=local node extracted/import-pdf-hours.mjs photo-inbox/manual-review/pdf-<sha256> --prepare
+PYTHONPATH=ocr-service OMP_NUM_THREADS=1 ocr-service/.venv/bin/python -m app.pdf_batch photo-inbox/manual-review/pdf-<sha256> --year <confirmed-year> --employees photo-inbox/manual-review/pdf-<sha256>/ocr/employees.json --apply-script extracted/import-pdf-hours.mjs
+```
+
+Replace `pdf-<sha256>` with the directory returned by the first command. The prepare step creates a full profile backup and exports employee labels for local OCR. Node, rather than Bun, runs the bundled importer because it uses the native `better-sqlite3` module. For a separate profile, supply the absolute inbox directory inside that profile.
+
+Each page has an atomic OCR checkpoint. Rerun the last command after interruption; completed pages are reused. Workers restart every eight pages to release native model allocations. The default is one worker (roughly 1 GB RAM); optionally use `--jobs 2` through `--jobs 4` only when sufficient memory is available. Completed batches are published to SQLite automatically.
+
+The year must be confirmed by the operator. Dates are assigned only when the printed weekday, day and month agree; ambiguous dates remain in the inbox, listed in `ocr/import-report-*.json`. All imported hours are uncertain until human review. Unknown printed employee names are retained as review-required identities. Existing employee/date rows are preserved rather than duplicated. Reimporting does not replace manual edits or confirmations.
+
+If parsing rules change, `--reparse` on the Python batch command regenerates proposals from saved text without rerunning OCR. Then run the Node importer with `--refresh-proposals` to replace only this PDF's untouched uncertain proposals; corrected, dismissed and confirmed rows remain protected.
+
 The OCR service keeps the original image and can write a processed extraction preview. Quality warnings are advisory unless the image cannot be decoded.
 
 ## Review

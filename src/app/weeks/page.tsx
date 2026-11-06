@@ -1,6 +1,9 @@
 import { getWeeks } from "@/lib/week-data";
 import { isLocalDataMode } from "@/lib/data-mode";
 import { CreateManualWeekForm } from "@/components/WeekListClient";
+import { WeeksCalendar } from "@/components/WeeksCalendar";
+import { WeeksYear } from "@/components/WeeksYear";
+import { isCalendarMonth, isCalendarYear } from "@/lib/week-calendar";
 
 export const dynamic = "force-dynamic";
 
@@ -12,8 +15,14 @@ function weekRange(weekStarting: string) {
   return `${formatter.format(start)} - ${formatter.format(end)}`;
 }
 
-export default function WeeksPage() {
+export default async function WeeksPage({ searchParams }: { searchParams: Promise<{ view?: string; month?: string; year?: string }> }) {
   const weeks = getWeeks();
+  const query = await searchParams;
+  const calendar = query.view === "calendar";
+  const yearly = query.view === "year";
+  const month = query.month && isCalendarMonth(query.month) ? query.month : weeks[0]?.weekStarting.slice(0, 7) || new Date().toISOString().slice(0, 7);
+  const year = query.year && isCalendarYear(query.year) ? query.year : month.slice(0, 4);
+  const calendarMonth = yearly ? `${year}-${month.slice(5, 7)}` : month;
   return (
     <section className="space-y-6">
       <div className="page-heading">
@@ -22,6 +31,15 @@ export default function WeeksPage() {
         <p>Choose a week to review its source documents, confirmed actual hours, and comparison.</p>
       </div>
       <CreateManualWeekForm readOnly={!isLocalDataMode()} />
+      <div className="weeks-view-toolbar">
+        <p><strong>{weeks.length}</strong> recorded week{weeks.length === 1 ? "" : "s"}<span> · Browse your daily sheets</span></p>
+        <nav className="weeks-view-switch" aria-label="Weeks view">
+          <a aria-current={!calendar && !yearly ? "page" : undefined} href={`/weeks?view=list&month=${calendarMonth}&year=${year}`}><span aria-hidden="true">☰</span> List</a>
+          <a aria-current={calendar ? "page" : undefined} href={`/weeks?view=calendar&month=${calendarMonth}`}><span aria-hidden="true">▦</span> Calendar</a>
+          <a aria-current={yearly ? "page" : undefined} href={`/weeks?view=year&year=${year}&month=${month}`}><span aria-hidden="true">▤</span> Year</a>
+        </nav>
+      </div>
+      {yearly ? <WeeksYear weeks={weeks} year={year} /> : calendar ? <WeeksCalendar weeks={weeks} month={month} /> : <>
       <div className="weeks-list">
         {weeks.length === 0 ? <div className="empty-state">No local week loaded.</div> : null}
         {weeks.map((week) => (
@@ -46,6 +64,7 @@ export default function WeeksPage() {
           </a>
         ))}
       </div>
+      </>}
     </section>
   );
 }

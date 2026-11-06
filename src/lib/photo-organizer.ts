@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readdirSync, renameSync, statSync } from "node:fs";
-import { basename, extname, join, resolve } from "node:path";
+import { basename, dirname, extname, join, resolve } from "node:path";
 import { readLocalExtraWeeks, readLocalWeek, writeLocalExtraWeeks, writeLocalWeek } from "./local-week-store";
 import type { LocalWeek } from "./week-data";
 import { isInsideDirectory, manualReviewPhotoRoot, organizedPhotoRoot, photoInboxRoot } from "./photo-inbox";
@@ -96,6 +96,9 @@ export function organizeAssignedPhotos() {
   for (const [path, reference] of [...references.entries()].sort(([a], [b]) => a.localeCompare(b))) {
     const source = resolve(localProfileDirectory(), path);
     if (!isInsideDirectory(localProfilePath(photoRoot), source) || !existsSync(source)) throw new Error(`Assigned photo was not found: ${path}`);
+    // PDF pages stay beside their original and manifest. Moving them breaks
+    // page provenance and makes a resumable PDF reimport create duplicates.
+    if (/^pdf-[a-f0-9]{64}$/.test(basename(dirname(source))) && existsSync(join(dirname(source), "manifest.json"))) continue;
     const directory = localProfilePath(organizedRoot, reference.weekStarting);
     mkdirSync(directory, { recursive: true });
     let index = 1;

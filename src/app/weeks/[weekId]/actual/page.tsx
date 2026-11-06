@@ -4,12 +4,14 @@ import { WeekCoverage } from "@/components/WeekCoverage";
 import { isLocalDataMode } from "@/lib/data-mode";
 import { ManualShiftForm } from "@/components/ManualShiftForm";
 
-export default async function ActualPage({ params }: { params: Promise<{ weekId: string }> }) {
+export default async function ActualPage({ params, searchParams }: { params: Promise<{ weekId: string }>; searchParams: Promise<{ date?: string }> }) {
   const { weekId } = await params;
   const week = getWeekData(weekId);
   const { shifts, documents } = week;
   const employees = week.employees.length ? week.employees : getWeekData().employees;
   const readOnly = !isLocalDataMode();
+  const requestedDate = (await searchParams).date;
+  const initialDate = documents.some(d => d.documentType === "daily_sheet" && d.documentDate === requestedDate) ? requestedDate : undefined;
   return (
     <section className="space-y-6">
       <div>
@@ -19,7 +21,7 @@ export default async function ActualPage({ params }: { params: Promise<{ weekId:
       <WeekCoverage week={week} />
       {readOnly ? <div className="demo-notice" role="note"><strong>Demo account</strong><span>Document processing and edits are disabled. These fictional records show how local processing looks.</span></div> : null}
       {!readOnly ? <ManualShiftForm employees={employees} weekId={week.id} weekStarting={week.weekStarting} /> : null}
-      <ActualWeekClient readOnly={readOnly} weekId={week.id} documents={documents} shifts={shifts} employees={employees} />
+      <ActualWeekClient key={`${week.id}-${initialDate ?? "all"}`} initialDate={initialDate} readOnly={readOnly} weekId={week.id} documents={documents} shifts={shifts} employees={employees} />
     </section>
   );
 }

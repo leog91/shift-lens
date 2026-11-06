@@ -37,11 +37,11 @@ export default async function PhotosPage({ searchParams }: { searchParams: Promi
       <section className="photo-actions">
         <div>
           <p className="eyebrow">1. Add</p>
-          <h2>Add images</h2>
-          <p>{readOnly ? "Demo accounts can view fictional evidence but cannot upload or process files." : "Files are copied to the review queue. JPEG, PNG, and WebP files up to 20 MB are supported."}</p>
+          <h2>Add images or PDFs</h2>
+          <p>{readOnly ? "Demo accounts can view fictional evidence but cannot upload or process files." : "Files are copied to the review queue. JPEG, PNG, and WebP files up to 20 MB, or PDFs up to 100 MB / 500 pages. PDFs become individual page images; originals and page references are retained. Reimporting the same PDF reuses its pages."}</p>
         </div>
         <form action={uploadPhotos} className="flex flex-wrap items-center gap-2">
-          <input accept="image/jpeg,image/png,image/webp" className="max-w-full text-sm" disabled={readOnly} multiple name="photos" required type="file" />
+          <input accept="image/jpeg,image/png,image/webp,application/pdf,.pdf" className="max-w-full text-sm" disabled={readOnly} multiple name="photos" required type="file" />
           <span title={readOnly ? "Demo account: uploads are disabled." : undefined}><button className="button-primary" disabled={readOnly} type="submit">Add to inbox</button></span>
         </form>
       </section>
@@ -85,7 +85,7 @@ export default async function PhotosPage({ searchParams }: { searchParams: Promi
 function PhotoCard({ file, weekStarting, showForm = false }: { file: PhotoFile; weekStarting: string; showForm?: boolean }) {
   const assignment = file.assignedToCurrentWeek ? "This week" : file.assignedWeekStarting ?? "Unassigned";
   return <article className="photo-card" id={`photo-${encodeURIComponent(file.path)}`}>
-    <a className="photo-preview" href={`/api/local-photo?path=${encodeURIComponent(file.path)}`} target="_blank"><img alt={file.filename} src={`/api/local-photo?path=${encodeURIComponent(file.path)}`} /></a>
+    <a className="photo-preview" href={`/api/local-photo?path=${encodeURIComponent(file.path)}`} target="_blank"><img alt={file.filename} loading="lazy" decoding="async" src={`/api/local-photo?path=${encodeURIComponent(file.path)}`} /></a>
     <div className="min-w-0 space-y-1 p-3"><p className="truncate font-semibold" title={file.filename}>{file.filename}</p><p className="text-xs text-stone-600">{file.documentDate ?? "No date"} · {file.documentType?.replace("_", " ") ?? "No type"}</p><span className={file.assignedWeekStarting ? "photo-status assigned" : "photo-status"}>{assignment}</span>{file.assignmentNote ? <p className="text-xs text-stone-600">{file.assignmentNote}</p> : null}</div>
     {showForm ? <PhotoAssignmentForm file={file} weekStarting={weekStarting} /> : <details className="photo-card-details"><summary>View or change assignment</summary><PhotoAssignmentForm file={file} weekStarting={weekStarting} /></details>}
   </article>;

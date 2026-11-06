@@ -1,4 +1,5 @@
 import re
+import unicodedata
 from difflib import SequenceMatcher
 
 from .schemas import DailyRow, ExtractedValue, TextDetection
@@ -94,7 +95,7 @@ def group_columns(row: list[TextDetection]) -> list[TextDetection]:
 
 
 def normalise_name(value: str) -> str:
-    return re.sub(r"[^a-z]", "", value.lower())
+    return re.sub(r"[^a-z]", "", unicodedata.normalize("NFKD", value.lower()))
 
 
 def detection_x(item: TextDetection) -> float:
@@ -151,6 +152,18 @@ def parse_daily_rows(detections: list[TextDetection], known_employees: list[dict
             "finish": find_header_x(detections, "Finish"),
             "break": find_header_x(detections, "Break"),
         }
+        # Header midpoints bound each column: a blank break must never borrow
+        # a finish time or food note, even on high-resolution scans.
+        all_headers = sorted(x for x in [find_header_x(detections, label) for label in ["Name", "Start", "T&a", "Finish", "Break", "Staff food"]] if x is not None)
+        def column_cell(row, key):
+            x = header_x[key]
+            if x is None:
+                return None
+            previous = max((other for other in all_headers if other < x), default=x - 120 * scale)
+            following = min((other for other in all_headers if other > x), default=x + 120 * scale)
+            bounded = [cell for cell in row if (previous + x) / 2 <= detection_x(cell) < (x + following) / 2]
+            return nearest_cell(bounded, x, scale)
+
         matches: dict[str, dict] = {}
         employee_names: set[str] = set()
         for employee in known_employees:
@@ -187,20 +200,28 @@ def parse_daily_rows(detections: list[TextDetection], known_employees: list[dict
                     key=lambda entry: abs(detection_y(candidate) - detection_y(entry[0])),
                 )[0] is item
             ]
-            start = nearest_cell(row, header_x["start"], scale)
-            finish = nearest_cell(row, header_x["finish"], scale)
-            break_value = nearest_cell(row, header_x["break"], scale)
+            start = column_cell(row, "start")
+            finish = column_cell(row, "finish")
+            break_value = column_cell(row, "break")
             # If header positions failed to locate the times, fall back to clustering.
-            if (start is None or finish is None) and cluster_start_x is not None and cluster_finish_x is not None:
+            if (header_x["start"] is None or header_x["finish"] is None) and cluster_start_x is not None and cluster_finish_x is not None:
                 fallback_start, fallback_finish = assign_time_by_cluster(row, cluster_start_x, cluster_finish_x)
-                if start is None:
+                if header_x["start"] is None:
                     start = fallback_start
-                if finish is None:
+                if header_x["finish"] is None:
                     finish = fallback_finish
             # Do not repeat the employee label when a column cell was not detected.
             start = start if start and start.rawValue != item.text else None
             finish = finish if finish and finish.rawValue != item.text else None
             break_value = break_value if break_value and break_value.rawValue != item.text else None
+            if break_value and break_value.rawValue:
+                raw_break = break_value.rawValue.strip().lower()
+                if raw_break in {"no", "0", "nil", "none"}:
+                    break_value.minutes = 0
+                else:
+                    duration = re.fullmatch(r"(\d{1,3})\s*(?:min(?:ute)?s?|m)?", raw_break)
+                    if duration:
+                        break_value.minutes = int(duration[1])
             reasons = ["OCR values require review before counting."]
             if fuzzy_match:
                 reasons.append("Employee name was matched approximately from OCR text.")

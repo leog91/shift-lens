@@ -1,4 +1,5 @@
 from typing import Any
+import os
 
 from .schemas import BoundingBox, TextDetection
 
@@ -23,6 +24,7 @@ class PaddleEngine:
                 use_doc_unwarping=False,
                 use_textline_orientation=False,
                 enable_mkldnn=False,
+                cpu_threads=max(1, int(os.environ.get("SHIFT_LENS_OCR_THREADS", "2"))),
             )
         except Exception as exc:
             self._initialisation_error = str(exc)

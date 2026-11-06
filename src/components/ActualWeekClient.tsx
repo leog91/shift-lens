@@ -39,14 +39,15 @@ function useReviewState(weekId: string) {
   return { value, update };
 }
 
-export function ActualWeekClient({ weekId, documents, shifts, employees, readOnly = false }: { weekId: string; documents: LocalDocument[]; shifts: ShiftInput[]; employees: EmployeeOption[]; readOnly?: boolean }) {
+export function ActualWeekClient({ weekId, documents, shifts, employees, readOnly = false, initialDate }: { weekId: string; documents: LocalDocument[]; shifts: ShiftInput[]; employees: EmployeeOption[]; readOnly?: boolean; initialDate?: string }) {
   const [localShifts, setLocalShifts] = useState(shifts);
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
   const [editing, setEditing] = useState<Record<string, { startTime: string; finishTime: string; breakMinutes: string; correctionReason: string }>>({});
   const { value: view, update: updateView } = useReviewState(weekId);
   const selectedShiftByDocument = view.selected ?? {};
   const employeeId = view.employeeId ?? "all";
-  const date = view.date ?? "all";
+  const [calendarDate, setCalendarDate] = useState(initialDate);
+  const date = calendarDate ?? view.date ?? "all";
   const status = view.status ?? "all";
   const [pending, setPending] = useState<Record<string, boolean>>({});
   const pendingRef = useRef(new Set<string>());
@@ -143,7 +144,7 @@ export function ActualWeekClient({ weekId, documents, shifts, employees, readOnl
           </select>
         </label>
         <label className="grid gap-1 text-sm">Date
-          <select className="rounded border p-2" onChange={(event) => updateView({ date: event.target.value })} value={date}>
+          <select className="rounded border p-2" onChange={(event) => { setCalendarDate(undefined); updateView({ date: event.target.value }); }} value={date}>
             <option value="all">Whole week</option>
             {dates.map((item) => <option key={item} value={item}>{item}</option>)}
           </select>

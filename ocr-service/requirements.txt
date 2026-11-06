@@ -10,3 +10,5 @@ pytest
 httpx
 paddleocr
 paddlepaddle
+
+pypdfium2

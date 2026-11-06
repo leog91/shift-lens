@@ -4,6 +4,7 @@ import { missingDailySheetDates } from "./week-coverage";
 import { isLocalDataMode } from "./data-mode";
 import { getDemoWeeks } from "@/demo/database";
 import { getLocalWeeks } from "./local-sqlite-store";
+import { calendarDays } from "./week-calendar";
 
 const LocalDocumentSchema = z.object({
   id: z.string(),
@@ -130,6 +131,7 @@ export function getWeeks() {
       status: week.status,
       documents: week.documents.length,
       missingDailySheetDates: missingDailySheetDates(week),
+      days: calendarDays(week),
       openReviewItems: week.reviewItems.length,
       discrepancies: 0
     }))
