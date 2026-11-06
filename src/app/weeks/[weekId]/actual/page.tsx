@@ -11,7 +11,7 @@ export default async function ActualPage({ params, searchParams }: { params: Pro
   const employees = week.employees.length ? week.employees : getWeekData().employees;
   const readOnly = !isLocalDataMode();
   const requestedDate = (await searchParams).date;
-  const initialDate = documents.some(d => d.documentType === "daily_sheet" && d.documentDate === requestedDate) ? requestedDate : undefined;
+  const initialDate = documents.some(d => d.documentType === "daily_sheet" && d.documentDate === requestedDate) || shifts.some(s => s.date === requestedDate) ? requestedDate : undefined;
   return (
     <section className="space-y-6">
       <div>

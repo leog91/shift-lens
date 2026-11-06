@@ -58,7 +58,7 @@ export function ActualWeekClient({ weekId, documents, shifts, employees, readOnl
   const dailyDocuments = documents
     .filter((document) => document.documentType === "daily_sheet")
     .sort((a, b) => (a.documentDate ?? "").localeCompare(b.documentDate ?? ""));
-  const dates = [...new Set(dailyDocuments.map((document) => document.documentDate).filter((item): item is string => Boolean(item)))].sort();
+  const dates = [...new Set([...dailyDocuments.map((document) => document.documentDate).filter((item): item is string => Boolean(item)), ...localShifts.map((shift) => shift.date)])].sort();
 
   const filteredDocuments = dailyDocuments.filter((document) => date === "all" || document.documentDate === date);
   const filteredShifts = useMemo(() => localShifts.filter((shift) => {
@@ -164,6 +164,11 @@ export function ActualWeekClient({ weekId, documents, shifts, employees, readOnl
         </div>
       </div>
 
+      {date !== "all" && filteredDocuments.length === 0 && <section className="rounded-lg border bg-white p-4 space-y-3">
+        <h2 className="font-semibold">{date} — no daily sheet attached</h2>
+        <p className="text-sm text-amber-800">The recorded hours below cannot be checked against a paper yet. <a className="underline" href={`/weeks/${weekId}/documents`}>Open documents to check or add the missing sheet.</a></p>
+        <div className="overflow-x-auto"><table className="hours-table"><thead><tr><th>Employee</th><th>Start</th><th>Finish</th><th>Break</th><th>Status</th></tr></thead><tbody>{filteredShifts.map((shift) => <tr key={shift.id}><td data-label="Employee">{shift.employeeName}</td><td data-label="Start">{shift.startTime ?? "Review"}</td><td data-label="Finish">{shift.finishTime ?? "Review"}</td><td data-label="Break">{shift.breakMinutes == null ? "Review" : `${shift.breakMinutes} min`}</td><td data-label="Status">{shift.status}</td></tr>)}</tbody></table></div>
+      </section>}
       {filteredDocuments.map((document) => {
          const allDocumentShifts = localShifts.filter((shift) => belongsToDocument(shift, document));
         const documentShifts = filteredShifts.filter((shift) => belongsToDocument(shift, document));

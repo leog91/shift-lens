@@ -12,7 +12,7 @@ export default async function ConfirmedHoursPage({ params }: { params: Promise<{
         <h1>Confirmed hours</h1>
         <p>Week starting {week.weekStarting}. Only complete, confirmed actual shifts are shown.</p>
       </div>
-      <ConfirmedHoursClient weekStarting={week.weekStarting} shifts={week.shifts} />
+      <ConfirmedHoursClient weekId={week.id} weekStarting={week.weekStarting} shifts={week.shifts} />
     </section>
   );
 }

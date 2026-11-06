@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { formatDuration, workedMinutes, type ShiftInput } from "@/domain/reconciliation";
 
 type ConfirmedShift = Omit<ShiftInput, "startTime" | "finishTime" | "breakMinutes"> & {
@@ -36,7 +37,7 @@ function shareText(weekStarting: string, shifts: ConfirmedShift[]) {
   ].join("\n");
 }
 
-export function ConfirmedHoursClient({ weekStarting, shifts }: { weekStarting: string; shifts: ShiftInput[] }) {
+export function ConfirmedHoursClient({ weekId, weekStarting, shifts }: { weekId: string; weekStarting: string; shifts: ShiftInput[] }) {
   const [shareStatus, setShareStatus] = useState<string | null>(null);
   const confirmedShifts: ConfirmedShift[] = shifts.flatMap((shift) => {
     const { startTime, finishTime, breakMinutes } = shift;
@@ -100,7 +101,7 @@ export function ConfirmedHoursClient({ weekStarting, shifts }: { weekStarting: s
                       <tbody>
                         {personShifts.map((shift) => (
                           <tr key={shift.id}>
-                            <td data-label="Day">{formatDay(shift.date)}</td>
+                            <td data-label="Day"><Link className="hours-day-link" href={`/weeks/${weekId}/actual?date=${shift.date}`} title="View this day’s paper and recorded hours">{formatDay(shift.date)}<span className="no-print" aria-hidden="true"> ↗</span><span className="sr-only"> — view paper and recorded hours</span></Link></td>
                             <td data-label="Start">{shift.startTime}</td>
                             <td data-label="Finish">{shift.finishTime}</td>
                             <td data-label="Break">{shift.breakMinutes} min</td>

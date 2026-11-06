@@ -59,6 +59,12 @@ Each day distinguishes a loaded sheet, a missing sheet in an existing week, or a
 
 Click a loaded day to open its paper with that date selected. Click a missing day to open the week's documents. Each week dashboard also includes a seven-day sheet grid. On smaller screens, scroll the grid horizontally to see all seven days. These views do not edit records or change confirmed totals.
 
+## Monthly and Yearly Hours
+
+Open an employee's history or **Analytics**, then choose **Week**, **Month**, or **Year** above the chart. The chart and table show confirmed worked hours and shift counts for each period. Monthly and yearly totals use each shift's date, so a week crossing a month or year boundary is split correctly. All calculations use integer minutes; uncertain or incomplete shifts stay excluded.
+
+Amber bars and table warnings indicate missing daily sheets in loaded weeks. These are totals from loaded records, not a guarantee of full month/year coverage: unrecorded days or weeks may still be missing. The chart's hour scales adjust automatically and remain fixed on both sides while long histories scroll horizontally.
+
 ## Assigning Photos
 
 Use `/photos` as an inbox for local images.
