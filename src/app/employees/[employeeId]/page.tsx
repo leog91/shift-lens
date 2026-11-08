@@ -2,6 +2,8 @@ import { formatDuration } from "@/domain/reconciliation";
 import { getAllWeekData } from "@/lib/week-data";
 import { hoursHistory } from "@/lib/hours-history";
 import { HoursHistory } from "@/components/HoursHistory";
+import { HoursExplorer } from "@/components/HoursExplorer";
+import { missingDailySheetDates } from "@/lib/week-coverage";
 
 export default async function EmployeeHoursPage({ params }: { params: Promise<{ employeeId: string }> }) {
   const { employeeId } = await params;
@@ -20,5 +22,6 @@ export default async function EmployeeHoursPage({ params }: { params: Promise<{ 
       <div className="hours-stat"><span>Aliases</span><strong>{employee?.aliases.length ?? 0}</strong></div>
     </div>
     {periods.week.length === 0 ? <div className="empty-state">No complete confirmed shifts are available for this employee yet.</div> : <HoursHistory periods={periods} name={name} headingId="employee-history-heading" />}
+    <HoursExplorer key={employeeId} shifts={weeks.flatMap(week => week.shifts).filter(shift => shift.employeeId === employeeId)} weekStarts={weeks.map(week => week.weekStarting)} missingDates={weeks.flatMap(missingDailySheetDates)} initialEmployeeId={employeeId} />
   </section>;
 }

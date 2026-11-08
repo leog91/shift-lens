@@ -19,6 +19,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link className="app-brand" href="/weeks">ShiftLens</Link>
             <nav className="app-nav" aria-label="Main navigation">
               <Link href="/weeks">Weeks</Link>
+              <Link href="/hours">Hours</Link>
               <Link href="/analytics">Analytics</Link>
               <Link href="/photos">Photos</Link>
               <Link href="/employees">Employees</Link>
