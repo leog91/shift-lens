@@ -160,6 +160,15 @@ Never infer the mode from whether a profile directory exists. Keeping local mode
 
 Use one Vercel project for demo and private production access with `SHIFT_LENS_DATA_MODE=hosted` and the credentials in [dashboard setup](docs/hosted-dashboard.md). Google Cloud is not required: provision the owner password with `bun run hosted:owner` after initializing hosted tables.
 
+Keep local app settings in ignored `.env.local` and hosted admin settings in ignored `.env.hosted.local`. Initialize the hosted database and owner with:
+
+```bash
+bun --env-file=.env.hosted.local run hosted:init
+bun --env-file=.env.hosted.local run hosted:owner
+```
+
+Use the same hosted settings in Vercel Production, then deploy. Restart the local app to begin syncing and check its status banner. If your existing database is at root-level `data/shiftlens.sqlite`, omit `SHIFT_LENS_PROFILE_DIR`; do not copy a nonexistent sample profile path. The hosted company ID is independent of the local folder path. See the [post-deployment checklist](docs/hosted-dashboard.md#after-configuring-vercel-and-redeploying).
+
 For a demo-only deployment or Preview environment, use these settings. Its read-only, in-memory SQLite database is seeded on each server instance and does not process or persist user files:
 
 - Framework preset: `Next.js`

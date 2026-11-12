@@ -4,6 +4,19 @@ ShiftLens supports three explicit modes: `demo`, `local`, and `hosted`. **Use on
 
 Public demo pages use only the in-memory fictional database, never Turso snapshots. Private data is read through a separate server-side authenticated path. Signed-in owners can explicitly choose “View demo”; those pages remain clearly labeled fictional, including after client-side navigation. Login does not merge real data into demo records.
 
+## Which environment settings go where?
+
+Both environment files below live in the repository root and are ignored by Git. Create them yourself; `.env.example` is only a template, not a loaded configuration file.
+
+| Location | Purpose | Contents |
+| --- | --- | --- |
+| `.env.local` | Run your local app and automatic sync | Local mode, optional existing profile path, sync URL, sync token, source UUID |
+| `.env.hosted.local` | Run trusted hosted database/account setup from your computer | The hosted variables listed in step 2 |
+| Vercel → project Settings → Environment Variables → Production | Run the combined public demo/private dashboard | The same hosted variables as `.env.hosted.local` |
+| Vercel → Preview | Demo-only previews | `SHIFT_LENS_DATA_MODE=demo`, without production credentials |
+
+Normal `bun run dev` uses `.env.local`. Admin commands below explicitly select `.env.hosted.local`, so you do not need to change the local app's mode. Settings entered in Vercel are not automatically available in your local terminal. Never store your login password in either file or Vercel settings, and never commit the real environment files.
+
 ## Privacy boundary
 
 - Local SQLite remains authoritative. Photos, PDFs, document pages, filenames, paths, raw OCR, review reasons, aliases, roster data, and correction history never enter the sync payload.
@@ -45,20 +58,20 @@ SHIFT_LENS_SYNC_TOKEN=YOUR-SECOND-SECRET
 SHIFT_LENS_SYNC_SOURCE_ID=YOUR-SOURCE-UUID
 ```
 
-`SHIFT_LENS_HOSTED_COMPANY_ID` is a stable identifier for this business. Reads and sync writes take it from the server configuration, **never from the browser or payload**.
+`SHIFT_LENS_HOSTED_COMPANY_ID` is a stable identifier for this business. Reads and sync writes take it from the server configuration, **never from the browser or payload**. Use the same value in Vercel and `.env.hosted.local`. It is not a folder path and does not need to match `SHIFT_LENS_PROFILE_DIR`.
 
-Initialize the remote tables once using those variables in a trusted shell:
+Save those hosted variables in the ignored `.env.hosted.local` file as well as Vercel Production. From the repository directory, initialize the remote tables once:
 
 ```bash
-bun run hosted:init
+bun --env-file=.env.hosted.local run hosted:init
 ```
 
 This runs only idempotent `CREATE TABLE/INDEX IF NOT EXISTS` statements and does not read or upload a local profile. It creates Better Auth tables and the separate verified-snapshot table. Future schema changes require explicit migrations; do not change an existing table definition and assume this initializer will migrate it.
 
-With the same hosted variables configured in your trusted local terminal, create the owner:
+Create the owner using the same hosted file:
 
 ```bash
-bun run hosted:owner
+bun --env-file=.env.hosted.local run hosted:owner
 ```
 
 Enter and confirm a unique password of 12–128 characters. Input is hidden, never accepted as a command argument or environment variable, and only Better Auth's scrypt password hash is stored in Turso. Use a password manager. The admin command marks the configured account approved; no mailbox verification link is needed. The password itself does **not** go in Vercel environment settings or `.env.local`.
@@ -66,7 +79,7 @@ Enter and confirm a unique password of 12–128 characters. Input is hidden, nev
 To recover a forgotten password or deliberately replace it:
 
 ```bash
-bun run hosted:owner --reset
+bun --env-file=.env.hosted.local run hosted:owner --reset
 ```
 
 Reset requires trusted database access, replaces the password atomically, and revokes existing owner sessions. Without `--reset`, an existing password cannot accidentally be overwritten. There is no public password-reset email flow. Converting an existing Google-only owner with `hosted:owner` removes obsolete OAuth tokens and revokes its old sessions; Google environment variables can be removed.
@@ -77,19 +90,54 @@ Build/dev scripts use Next.js's supported Webpack mode: Turbopack's file tracing
 
 ## 3. Configure the local computer
 
-Add to ignored `.env.local`, alongside your existing local profile settings:
+Create or update the ignored `.env.local` file in the repository root. For existing root-level `data/` and `photo-inbox/` folders, use:
 
 ```dotenv
 SHIFT_LENS_DATA_MODE=local
-SHIFT_LENS_PROFILE_DIR=profiles/restaurant-a
 SHIFT_LENS_SYNC_URL=https://YOUR-DASHBOARD-DOMAIN/api/sync
 SHIFT_LENS_SYNC_TOKEN=YOUR-SECOND-SECRET
 SHIFT_LENS_SYNC_SOURCE_ID=YOUR-SOURCE-UUID
 ```
 
+Only add `SHIFT_LENS_PROFILE_DIR` if you already use a separate profile directory containing its own `data/shiftlens.sqlite` and `photo-inbox/`. For example:
+
+```dotenv
+SHIFT_LENS_PROFILE_DIR=profiles/your-existing-business
+```
+
+Do not copy a sample profile path that does not exist: it selects a different storage location and does not move your current data. If the database is at `data/shiftlens.sqlite` in the repository root, omit the variable. The hosted company ID is independent of this path. Do not set a profile path on Vercel.
+
+`SHIFT_LENS_SYNC_TOKEN` and `SHIFT_LENS_SYNC_SOURCE_ID` must exactly match their Vercel values. Use your actual deployed HTTPS domain followed by `/api/sync` for `SHIFT_LENS_SYNC_URL`. The local app does not need Turso credentials, `BETTER_AUTH_SECRET`, the hosted company ID, or your login password.
+
 Restart the local app with `bun run dev`. Startup sync includes existing verified shifts automatically. Legacy payroll is not silently promoted to verified. The local status banner confirms whether sync is configured, pending, successful, or failing. Local processing does not require a network connection.
 
 For a long-running production local server, build with local mode and start with `bun run start:local`; the same instrumentation starts its sync worker. The local dev and production scripts bind to loopback so local document access is not exposed to the LAN. The sync token grants write access to this one hosted business, so protect the local machine and environment file.
+
+## After configuring Vercel and redeploying
+
+1. Run `hosted:init` and `hosted:owner` with the explicit hosted environment file if you have not done so already. Changing Vercel settings and redeploying does not create database tables or a password automatically. Do not reset an existing password just to redeploy.
+2. Open the deployed site in an incognito window. `/` should show the fictional demo and a **Sign in** link.
+3. Sign in with `SHIFT_LENS_HOSTED_OWNER_EMAIL` and the password chosen in the owner command. A new dashboard may be empty until the first sync.
+4. Restart the local app with `bun run dev`. Wait for its status banner to report **synced**. The local app must remain running and connected for future automatic updates.
+5. Refresh the online dashboard and check verified hours. Use **View demo** to confirm sample pages remain fictional; signing out should return to the demo.
+
+Vercel environment changes require a new deployment. Local environment changes require restarting the local app. Production uses `bun install --frozen-lockfile` and `bun run build`; Vercel manages the production server, so do not configure `bun run dev` as a Vercel start command.
+
+### Troubleshooting
+
+| Symptom | Check |
+| --- | --- |
+| No sign-in link online | Production must use `SHIFT_LENS_DATA_MODE=hosted`; redeploy after changing it. Preview/demo-only deployments intentionally have no login. |
+| Admin command says hosted storage is disabled | Use `bun --env-file=.env.hosted.local run ...` and put `SHIFT_LENS_DATA_MODE=hosted` in that file. |
+| Login fails or tables are missing | Run the initializer and owner command against the same Turso database used by Vercel. The email must match the configured owner. |
+| Local data appears missing | Remove a copied sample `SHIFT_LENS_PROFILE_DIR` if your existing database is in root-level `data/`, or select your actual existing profile. Restart; do not initialize a new empty profile to recover data. |
+| Cloud sync is not configured | Set the `/api/sync` URL, shared sync token, and source UUID in `.env.local`, then restart. |
+| Sync reports HTTP 401 | Check that the sync token matches Vercel and that the deployed endpoint is the intended production site. |
+| Sync reports HTTP 409 | Investigate a source/revision conflict before changing anything; see the restore guidance below. |
+| Sync reports HTTP 404 or 503 | Check the URL, hosted mode, deployment readiness, hosted credentials, and table initialization. |
+| Verified paid hours are missing | Legacy payroll is unverified by default. Review all values, check the verification box, save locally, and wait for sync. |
+
+Share error messages when seeking help, not passwords, tokens, environment-file contents, or real payroll records.
 
 ## Security and operations
 

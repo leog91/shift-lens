@@ -1,6 +1,14 @@
 # ShiftLens Usage Guide
 
-ShiftLens compares confirmed handwritten actual hours with paid hours. It is local-first: real photos and payroll data stay in ignored local files. The default workspace is fictional demo data; it cannot read or modify local files.
+ShiftLens compares confirmed handwritten actual hours with paid hours. It is local-first: original photos, documents, OCR, and review data stay local. Optional hosted mode automatically syncs only approved data fields after verification; employee names and verified hours are then stored privately online. The default workspace is fictional demo data; it cannot read or modify local files.
+
+## Viewing Verified Data Online
+
+One Vercel project can serve both experiences: signed-out visitors see the fictional demo, while owner email/password login opens the private, read-only verified-hours dashboard. There is no public sign-up and no Google Cloud requirement. All document processing, corrections, and verification remain in the local app.
+
+Follow [hosted dashboard setup](hosted-dashboard.md) for Turso, Vercel, `.env.hosted.local` admin commands, and `.env.local` sync settings. If you use existing root-level `data/` and `photo-inbox/` folders, omit `SHIFT_LENS_PROFILE_DIR`; the hosted company ID is not a local folder name.
+
+Once configured, keep the local app running and connected. Confirmed shifts and explicitly verified payroll sync automatically, including subsequent changes, removals, and revoked verification. The local status banner shows pending/synced/error; refresh the website after sync. Legacy payroll must be reviewed and marked verified before it appears online. The dashboard contains confirmed subtotals only, not a guarantee that an entire week is complete.
 
 ## Switching Businesses
 
