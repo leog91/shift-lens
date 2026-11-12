@@ -10,6 +10,8 @@ Follow [hosted dashboard setup](hosted-dashboard.md) for Turso, Vercel, `.env.ho
 
 Once configured, keep the local app running and connected. Confirmed shifts and explicitly verified payroll sync automatically, including subsequent changes, removals, and revoked verification. The local status banner shows pending/synced/error; refresh the website after sync. Legacy payroll must be reviewed and marked verified before it appears online. The dashboard contains confirmed subtotals only, not a guarantee that an entire week is complete.
 
+The private dashboard has **Weeks**, **Hours**, **Employees**, and **Paid hours** views. Choose a week or day/month/year/all-time period and employee, then click **Apply filters**. You can inspect employee rankings, distinct days worked, daily entries, hours history/charts, and verified paid-minute categories. Use **Refresh data** to load the latest sync. Missing paid hours remain unavailable, not zero; weekly paid values are not spread across calendar months. Original documents, clock times, breaks, and review details remain in the local app.
+
 ## Switching Businesses
 
 Use one local profile directory for each business. Create it once:

@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test('dismiss, rescan, restore, correct and backup preserve review history', async ({ page, request }) => {
   await page.goto('/weeks/lifecycle/actual');
+  await expect(page.getByRole('status').filter({ hasText: 'Cloud sync is not configured. All data remains local.' })).toBeVisible();
   await page.getByRole('combobox', { name: 'Employee', exact: true }).selectOption('one');
   await page.getByRole('button', { name: 'Dismiss: incorrect OCR', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Fictional one', exact: true })).toHaveCount(0);

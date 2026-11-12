@@ -70,6 +70,7 @@ input[type="submit"]:not(:disabled) {
 .week-sections { display: flex; gap: 0.25rem; overflow-x: auto; border-bottom: 1px solid #e7e5e4; padding-bottom: 0.45rem; white-space: nowrap; }
 .week-sections a { border-radius: 0.375rem; color: #57534e; padding: 0.35rem 0.5rem; font-size: 0.8125rem; font-weight: 600; }
 .week-sections a:hover { background: #e7e5e4; color: #1c1917; }
+.week-sections a[aria-current="page"] { background: #e7e5e4; color: #1c1917; }
 
 .weeks-list { display: grid; gap: 0.75rem; }
 .week-card { display: grid; gap: 1rem; border: 1px solid #e7e5e4; border-radius: 0.625rem; background: #fff; color: #1c1917; padding: 1rem; transition: border-color 120ms ease, box-shadow 120ms ease; }

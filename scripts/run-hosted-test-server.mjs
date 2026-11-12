@@ -16,6 +16,8 @@ database.close();
 const child = spawn(process.execPath, ["node_modules/next/dist/bin/next", "dev", "--webpack", "-p", "3102"], {
   stdio: "inherit", env: {
     ...process.env, SHIFT_LENS_DATA_MODE: "hosted", SHIFT_LENS_NEXT_DIST_DIR: ".next/e2e-hosted",
+    SHIFT_LENS_SYNC_URL: "", SHIFT_LENS_PROFILE_DIR: "", SHIFT_LENS_BACKUP_DIR: "",
+    TURSO_AUTH_TOKEN: "", OPENAI_API_KEY: "", OPENAI_VISION_MODEL: "", OCR_SERVICE_URL: "",
     TURSO_DATABASE_URL: `file:${join(directory, "hosted.sqlite")}`,
     BETTER_AUTH_URL: "http://127.0.0.1:3102", BETTER_AUTH_SECRET: "fictional-auth-secret-at-least-32-characters",
     SHIFT_LENS_SYNC_TOKEN: "fictional-sync-secret-at-least-32-characters",

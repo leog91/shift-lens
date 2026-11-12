@@ -26,6 +26,19 @@ Normal `bun run dev` uses `.env.local`. Admin commands below explicitly select `
 - Each local edit saves the approved snapshot in a SQLite outbox in the same transaction. A background worker in the local Next.js server checks every 15 seconds, catches up existing verified records at startup, and retries failures. **No publishing button.** Changes, verification revocations, and deletions replace the hosted snapshot atomically.
 - The latest snapshot coalesces offline changes. The local server must be running and connected to sync; the dashboard remains readable while it is off, but may be stale. Refresh the dashboard to see updates. Local status shows pending/synced/error and hosted status shows the last accepted change.
 
+## Private dashboard views
+
+The private workspace provides read-only browsing closer to the local app, using the same existing verified snapshot. No new document fields or database migrations are needed:
+
+- **Weeks:** choose a synced week and employee, compare confirmed worked/verified paid hours, inspect daily verified entries, browse all synced weeks, and navigate to earlier/later weeks. The initial selection prefers the most recent week with verified data, not an empty newer week.
+- **Hours:** choose day, week, month, year, or all time, then apply filters. Rankings show confirmed net hours, distinct days worked, and shift counts. Equal totals share a rank; filtering an employee does not change their rank against the selected period's other employees. Daily entries link to their day or employee history.
+- **Employees:** select an employee for confirmed hours history grouped by day/week/month/year/all time, a recent-period chart, first/last recorded dates, and all-time ranking. Period totals use shift dates, including weeks crossing a month or year boundary.
+- **Paid hours:** inspect ordinary, Sunday, other, and recorded total paid minutes for a source week. Missing verified payroll remains unavailable (—), not zero. Weekly paid hours are not allocated to calendar days/months. A category sum that differs from the recorded total is reported rather than silently overwritten.
+
+Use **Apply filters** after changing selections. Filters are encoded in private `/dashboard` URLs for bookmarking. **Refresh data** rechecks authentication and loads the latest accepted snapshot. **Last updated** shows the date and time (UTC) of the latest verified-data change accepted by Turso, not the page-load or deployment time; before the first sync it shows **Not yet synced**. Comparison cards aggregate differences only for employees with both actual and paid values; they never subtract incomplete paid totals from everyone else's actual hours.
+
+All worked totals are confirmed subtotals, not a claim that the week or month is complete. Days worked counts unique dates, so split shifts count as one day. Clock times, breaks, original sheets, roster context, and review details are not in the hosted snapshot; use the local app for those. No missing document coverage is inferred from the absence of an unverified row online.
+
 ## 1. Create credentials
 
 Create a **dedicated private Turso database** and a server-side database token. Never point the hosted app at the local SQLite file, and do not use embedded replication of the local database.
@@ -155,4 +168,4 @@ Share error messages when seeking help, not passwords, tokens, environment-file 
 
 Web dependencies are pinned to tested versions in `package.json` and `bun.lock`. Run `bun outdated` and `bun audit` regularly. This implementation updates Next.js to 16.4.6, React to 19.3.1, Better Auth to 1.7.22, and the other formerly floating web dependencies. The remaining audit finding at implementation time is moderate `minimatch` glob amplification in the ESLint/typescript-eslint toolchain; the upstream dependency range has not adopted minimatch 11. Do not force a major override across legacy minimatch callers. ESLint 10 and TypeScript 7 are separate major migrations, not silently included here. Python OCR dependencies have not been upgraded or audited as part of this web/auth change.
 
-Run `bun run test:unit` and `bun run test:e2e:hosted` for privacy, retry, revision, password login/reset, auth, and hosted-route tests. Hosted browser tests use a disposable fictional database and real password login to test the public/private transition, failed login, logout, and data separation. Remote Turso connectivity still needs a deployment smoke test with your credentials.
+Run `bun run test:unit` and `bun run test:e2e:hosted` for privacy, retry, revision, password login/reset, auth, and hosted-route tests. Hosted browser tests use a disposable fictional database and real password login to test the public/private transition, failed login, logout, and data separation. Local review browser tests explicitly clear sync and hosted credentials, even when `.env.local` is populated, so fictional profiles cannot publish to production. Remote Turso connectivity still needs a deployment smoke test with your credentials.

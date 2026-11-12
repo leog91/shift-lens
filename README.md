@@ -134,7 +134,7 @@ Do not copy or share a profile directory through Git. It contains personal emplo
 
 - `demo` is selected with `bun run demo`. It loads only tracked fictional records from `src/demo/` into a read-only in-memory SQLite database. Bundled fictional documents are viewable, but uploads, edits, local photos, and OCR are disabled.
 - `local` is selected with `bun run`. It loads the ignored profile SQLite database and photo inbox for private processing, with local OCR.
-- `hosted` serves the public fictional demo and private, read-only dashboard from the same Vercel project. Signed-out visitors see the demo; owner email/password login opens verified data in a dedicated Turso database. Verified data syncs automatically from the local app; original documents never sync. See [dashboard setup](docs/hosted-dashboard.md).
+- `hosted` serves the public fictional demo and a private, read-only dashboard. Verified data syncs automatically from the local app; original documents never sync. See [dashboard setup](docs/hosted-dashboard.md).
 
 The deployed demo is safe to share because its read path has only fictional records, no persisted user edits, and no image-processing service. Real employee and document processing remains in local mode. In hosted mode, private reads require server-side authentication and never feed demo pages; editing remains local.
 
@@ -155,30 +155,6 @@ shiftlens-backups/
 ```
 
 Never infer the mode from whether a profile directory exists. Keeping local mode explicit prevents an accidental deployment from exposing a local profile.
-
-## Deploying To Vercel
-
-Use one Vercel project for demo and private production access with `SHIFT_LENS_DATA_MODE=hosted` and the credentials in [dashboard setup](docs/hosted-dashboard.md). Google Cloud is not required: provision the owner password with `bun run hosted:owner` after initializing hosted tables.
-
-Keep local app settings in ignored `.env.local` and hosted admin settings in ignored `.env.hosted.local`. Initialize the hosted database and owner with:
-
-```bash
-bun --env-file=.env.hosted.local run hosted:init
-bun --env-file=.env.hosted.local run hosted:owner
-```
-
-Use the same hosted settings in Vercel Production, then deploy. Restart the local app to begin syncing and check its status banner. If your existing database is at root-level `data/shiftlens.sqlite`, omit `SHIFT_LENS_PROFILE_DIR`; do not copy a nonexistent sample profile path. The hosted company ID is independent of the local folder path. See the [post-deployment checklist](docs/hosted-dashboard.md#after-configuring-vercel-and-redeploying).
-
-For a demo-only deployment or Preview environment, use these settings. Its read-only, in-memory SQLite database is seeded on each server instance and does not process or persist user files:
-
-- Framework preset: `Next.js`
-- Install command: `bun install --frozen-lockfile`
-- Build command: `bun run build`
-- Environment variable: `SHIFT_LENS_DATA_MODE=demo`
-- Do not configure `SHIFT_LENS_PROFILE_DIR`, `DATABASE_URL`, OCR, or OpenAI variables.
-- Demo-only/Preview environments must not receive production Turso, auth, or sync secrets.
-
-Vercel runs the production Next.js server itself; do not configure `bun run dev` as a start command. `better-sqlite3` is listed in `serverExternalPackages` so the native module remains available to server functions.
 
 ## Phone Photos
 

@@ -15,7 +15,7 @@ export function AppHeader({ mode, signedIn }: { mode: DataMode; signedIn: boolea
     <header className="app-header">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
         <Link className="app-brand" href={mode === "hosted" ? "/" : "/weeks"}>ShiftLens</Link>
-        {privateArea ? <nav className="app-nav" aria-label="Main navigation"><Link href="/dashboard">Verified hours</Link><Link href="/weeks">View demo</Link></nav> : <nav className="app-nav" aria-label="Main navigation">
+        {privateArea ? <nav className="app-nav" aria-label="Main navigation"><Link href="/dashboard">Verified hours</Link><Link href="/dashboard?view=hours">Hours</Link><Link href="/dashboard?view=employees">Employees</Link><Link href="/dashboard?view=payroll">Paid hours</Link><Link href="/weeks">View demo</Link></nav> : <nav className="app-nav" aria-label="Main navigation">
           <Link href="/weeks">Weeks</Link><Link href="/hours">Hours</Link><Link href="/analytics">Analytics</Link>
           <Link href="/photos">Photos</Link><Link href="/employees">Employees</Link><Link href="/backups">Backups</Link><Link href="/settings/extraction">Extraction</Link>
           {mode === "hosted" ? <Link href={signedIn ? "/dashboard" : "/login"}>{signedIn ? "My verified hours" : "Sign in"}</Link> : null}
