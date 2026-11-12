@@ -1,7 +1,13 @@
 import "./globals.css";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { dataMode } from "@/lib/data-mode";
+import { SyncStatus } from "@/components/SyncStatus";
+import { headers } from "next/headers";
+import { authorizedCompany } from "@/lib/hosted/auth";
+import { AppHeader } from "@/components/AppHeader";
+
+// Never bake local records or a mode-specific redirect into a production build.
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "ShiftLens",
@@ -9,26 +15,14 @@ export const metadata: Metadata = {
   icons: { icon: "/favicon.svg" }
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const mode = dataMode();
+  const signedIn = mode === "hosted" && Boolean(await authorizedCompany(await headers()));
   return (
     <html lang="en">
       <body>
-        <header className="app-header">
-          <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
-            <Link className="app-brand" href="/weeks">ShiftLens</Link>
-            <nav className="app-nav" aria-label="Main navigation">
-              <Link href="/weeks">Weeks</Link>
-              <Link href="/hours">Hours</Link>
-              <Link href="/analytics">Analytics</Link>
-              <Link href="/photos">Photos</Link>
-              <Link href="/employees">Employees</Link>
-              <Link href="/backups">Backups</Link>
-              <Link href="/settings/extraction">Extraction</Link>
-            </nav>
-          </div>
-        </header>
-        {mode === "demo" ? <p className="bg-amber-100 px-4 py-2 text-center text-sm text-amber-950">Demo account: all records and documents are fictional. Editing and local file processing are disabled.</p> : null}
+        <AppHeader mode={mode} signedIn={signedIn} />
+        {mode === "local" ? <SyncStatus /> : null}
         <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
       </body>
     </html>

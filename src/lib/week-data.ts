@@ -81,7 +81,8 @@ const LocalWeekSchema = z.object({
     ordinaryPaidMinutes: z.number().int(),
     sundayPaidMinutes: z.number().int(),
     otherPaidMinutes: z.number().int(),
-    displayedTotalPaidMinutes: z.number().int().nullable()
+    displayedTotalPaidMinutes: z.number().int().nullable(),
+    verified: z.boolean().optional()
   })).default([]),
   reviewItems: z.array(z.object({
     id: z.string(),
@@ -112,6 +113,8 @@ const emptyWeek: LocalWeek = {
 };
 
 export function getAllWeekData(): LocalWeek[] {
+  // Hosted public pages always read the fictional database. Private snapshots
+  // have a separate, authenticated async read path and can never enter this API.
   if (!isLocalDataMode()) return getDemoWeeks();
   return getLocalWeeks().map((week) => LocalWeekSchema.parse(week));
 }

@@ -10,7 +10,8 @@ const UpsertPayrollSchema = z.object({
   ordinaryPaidMinutes: minutes,
   sundayPaidMinutes: minutes,
   otherPaidMinutes: minutes,
-  displayedTotalPaidMinutes: minutes.nullable()
+  displayedTotalPaidMinutes: minutes.nullable(),
+  verified: z.boolean().default(false)
 });
 
 export async function POST(request: NextRequest) {

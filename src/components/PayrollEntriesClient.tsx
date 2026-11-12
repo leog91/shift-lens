@@ -19,15 +19,19 @@ function draftFor(entry: PayrollInput | undefined): Draft {
   };
 }
 
-export function PayrollEntriesClient({ weekId, employees, payroll, readOnly }: { weekId: string; employees: Employee[]; payroll: PayrollInput[]; readOnly: boolean }) {
+type PayrollEntry = PayrollInput & { verified?: boolean };
+
+export function PayrollEntriesClient({ weekId, employees, payroll, readOnly }: { weekId: string; employees: Employee[]; payroll: PayrollEntry[]; readOnly: boolean }) {
   const [entries, setEntries] = useState(() => new Map(payroll.map((entry) => [entry.employeeId, entry])));
   const [drafts, setDrafts] = useState(() => new Map(employees.map((employee) => [employee.id, draftFor(entries.get(employee.id))])));
   const [messages, setMessages] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState<string | null>(null);
+  const [verified, setVerified] = useState(() => new Map(payroll.map(entry => [entry.employeeId, entry.verified === true])));
   const people = employees.filter((employee) => employee.id);
 
   function updateDraft(employeeId: string, field: keyof Draft, value: string) {
     setDrafts((current) => new Map(current).set(employeeId, { ...current.get(employeeId)!, [field]: value }));
+    setVerified(current => new Map(current).set(employeeId, false));
   }
 
   async function save(employee: Employee) {
@@ -50,7 +54,8 @@ export function PayrollEntriesClient({ weekId, employees, payroll, readOnly }: {
         ordinaryPaidMinutes: Number(draft.ordinaryPaidMinutes),
         sundayPaidMinutes: Number(draft.sundayPaidMinutes),
         otherPaidMinutes: Number(draft.otherPaidMinutes),
-        displayedTotalPaidMinutes: draft.displayedTotalPaidMinutes ? Number(draft.displayedTotalPaidMinutes) : null
+        displayedTotalPaidMinutes: draft.displayedTotalPaidMinutes ? Number(draft.displayedTotalPaidMinutes) : null,
+        verified: verified.get(employee.id) === true
       };
       const response = await fetch("/api/payroll/upsert", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
       const result = await response.json() as { ok: boolean; error?: string };
@@ -74,6 +79,7 @@ export function PayrollEntriesClient({ weekId, employees, payroll, readOnly }: {
         <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           {(["ordinaryPaidMinutes", "sundayPaidMinutes", "otherPaidMinutes", "displayedTotalPaidMinutes"] as const).map((field) => <label className="grid gap-1 text-sm" key={field}>{field === "ordinaryPaidMinutes" ? "Ordinary minutes" : field === "sundayPaidMinutes" ? "Sunday minutes" : field === "otherPaidMinutes" ? "Other minutes" : "Displayed total minutes (optional)"}<input className="rounded border p-2" min="0" onChange={(event) => updateDraft(employee.id, field, event.target.value)} type="number" value={draft[field]} /></label>)}
         </div>
+        <label className="mt-3 flex items-center gap-2 text-sm"><input type="checkbox" checked={verified.get(employee.id) === true} onChange={event => setVerified(current => new Map(current).set(employee.id, event.target.checked))} />I have verified all these paid-hours values. Saving verified data syncs it automatically when configured.</label>
         <button className="mt-3 rounded bg-stone-900 px-3 py-1.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50" disabled={saving === employee.id} onClick={() => save(employee)} type="button">{saving === employee.id ? "Saving..." : entry ? "Save paid hours" : "Add paid hours"}</button>
         {messages[employee.id] ? <p className="mt-2 text-sm text-stone-700" role="status">{messages[employee.id]}</p> : null}
       </>}

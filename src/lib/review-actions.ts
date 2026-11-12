@@ -38,6 +38,7 @@ export function applyReviewConfirmation(week: LocalWeek, reviewItemId: string, c
       payroll: week.payroll.map((entry) => entry.employeeName === item.employeeName ? {
         ...entry,
         ordinaryPaidMinutes: minutes,
+        verified: false,
         displayedTotalPaidMinutes: minutes + entry.sundayPaidMinutes + entry.otherPaidMinutes
       } : entry),
       reviewItems: week.reviewItems.filter((reviewItem) => reviewItem.id !== reviewItemId)

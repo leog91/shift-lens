@@ -5,6 +5,10 @@ const nextConfig: NextConfig = {
   distDir: process.env.SHIFT_LENS_NEXT_DIST_DIR ?? ".next",
   // Keep the native SQLite module available to server functions on Vercel.
   serverExternalPackages: ["better-sqlite3"],
+  // Runtime-only local files must never be bundled into a hosted deployment.
+  outputFileTracingExcludes: {
+    "/*": ["./data/**/*", "./profiles/**/*", "./photo-inbox/**/*", "./ocr-service/**/*", "./extracted/**/*", "./fallback/**/*", "./.env*"]
+  },
   allowedDevOrigins: ["127.0.0.1"],
   experimental: { serverActions: { bodySizeLimit: "110mb" } }
 };

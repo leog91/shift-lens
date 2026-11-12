@@ -1,9 +1,11 @@
 import { randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import Database from "better-sqlite3";
 import type { LocalWeek } from "./week-data";
 import { localProfilePath } from "./local-profile";
+import { projectVerifiedData } from "./sync/projection";
 
 type WeekRow = { id: string; week_starting: string; status: string };
 type EmployeeRow = { id: string; display_name: string; active: number };
@@ -11,7 +13,7 @@ type DocumentRow = { id: string; document_type: LocalWeek["documents"][number]["
 type ShiftRow = { id: string; employee_id: string; employee_name: string; date: string; start_time: string | null; finish_time: string | null; break_minutes: number | null; status: LocalWeek["shifts"][number]["status"]; source_document: string | null; source_document_id: string | null; source_row_id: string | null; uncertain_fields_json: string; extraction_json: string | null; corrections_json: string; dismissal_json: string | null; review_history_json: string };
 type RosterEstimateRow = { id: string; employee_id: string; employee_name: string; date: string; start_time: string; finish_time: string; break_minutes: number | null; source_document: string | null; status: "extracted" | "confirmed" | "manually_entered"; raw_finish_time: string | null; review_reason: string | null };
 type RosterAssignmentRow = { id: string; employee_id: string; employee_name: string; date: string; type: "standby" | "office" | "stock"; raw_value: string; source_document: string };
-type PayrollRow = { employee_id: string; employee_name: string; ordinary_paid_minutes: number; sunday_paid_minutes: number; other_paid_minutes: number; displayed_total_paid_minutes: number | null };
+type PayrollRow = { employee_id: string; employee_name: string; ordinary_paid_minutes: number; sunday_paid_minutes: number; other_paid_minutes: number; displayed_total_paid_minutes: number | null; verified: number };
 type ReviewRow = LocalWeek["reviewItems"][number];
 
 export function localDatabasePath() {
@@ -158,7 +160,19 @@ function createDatabase(path: string) {
       week_starting TEXT NOT NULL,
       payload_json TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS verified_sync_outbox (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      revision INTEGER NOT NULL,
+      payload_json TEXT NOT NULL,
+      payload_hash TEXT NOT NULL,
+      acknowledged_revision INTEGER NOT NULL DEFAULT 0,
+      acknowledged_target TEXT,
+      last_synced_at TEXT,
+      last_error TEXT
+    );
   `);
+  const payrollColumns = database.prepare("PRAGMA table_info(local_payroll_entries)").all() as Array<{ name: string }>;
+  if (!payrollColumns.some(column => column.name === "verified")) database.exec("ALTER TABLE local_payroll_entries ADD COLUMN verified INTEGER NOT NULL DEFAULT 0");
   const shiftColumns = database.prepare("PRAGMA table_info(local_shifts)").all() as Array<{ name: string }>;
   const addShiftColumn = (name: string, definition: string) => { if (!shiftColumns.some((column) => column.name === name)) database.exec(`ALTER TABLE local_shifts ADD COLUMN ${name} ${definition}`); };
   addShiftColumn("source_document_id", "TEXT");
@@ -285,7 +299,7 @@ function writeWeek(database: Database.Database, company: string, week: LocalWeek
     id: item.id, week_id: week.id, employee_id: item.employeeId, employee_name: item.employeeName, date: item.date, type: item.type, raw_value: item.rawValue, source_document: item.sourceDocument
   })));
   syncWeekTable(database, week.id, "local_payroll_entries", "employee_id", week.payroll.map((item) => ({
-    week_id: week.id, employee_id: item.employeeId, employee_name: item.employeeName, ordinary_paid_minutes: item.ordinaryPaidMinutes, sunday_paid_minutes: item.sundayPaidMinutes, other_paid_minutes: item.otherPaidMinutes, displayed_total_paid_minutes: item.displayedTotalPaidMinutes
+    week_id: week.id, employee_id: item.employeeId, employee_name: item.employeeName, ordinary_paid_minutes: item.ordinaryPaidMinutes, sunday_paid_minutes: item.sundayPaidMinutes, other_paid_minutes: item.otherPaidMinutes, displayed_total_paid_minutes: item.displayedTotalPaidMinutes, verified: item.verified === true ? 1 : 0
   })));
   syncWeekTable(database, week.id, "local_review_items", "id", week.reviewItems.map((item) => ({
     id: item.id, week_id: week.id, employee_name: item.employeeName, filename: item.filename, document_path: item.documentPath ?? null, review_type: item.reviewType ?? null, raw: item.raw, proposed: item.proposed, reason: item.reason
@@ -394,13 +408,14 @@ function readWeek(database: Database.Database, row: WeekRow): LocalWeek {
     rawValue: assignment.raw_value,
     sourceDocument: assignment.source_document
   }));
-  const payroll = (database.prepare("SELECT employee_id, employee_name, ordinary_paid_minutes, sunday_paid_minutes, other_paid_minutes, displayed_total_paid_minutes FROM local_payroll_entries WHERE week_id = ? ORDER BY employee_name").all(row.id) as PayrollRow[]).map((entry) => ({
+  const payroll = (database.prepare("SELECT employee_id, employee_name, ordinary_paid_minutes, sunday_paid_minutes, other_paid_minutes, displayed_total_paid_minutes, verified FROM local_payroll_entries WHERE week_id = ? ORDER BY employee_name").all(row.id) as PayrollRow[]).map((entry) => ({
     employeeId: entry.employee_id,
     employeeName: entry.employee_name,
     ordinaryPaidMinutes: entry.ordinary_paid_minutes,
     sundayPaidMinutes: entry.sunday_paid_minutes,
     otherPaidMinutes: entry.other_paid_minutes,
-    displayedTotalPaidMinutes: entry.displayed_total_paid_minutes
+    displayedTotalPaidMinutes: entry.displayed_total_paid_minutes,
+    verified: entry.verified === 1
   }));
   const reviewItems = database.prepare("SELECT id, employee_name AS employeeName, filename, document_path AS documentPath, review_type AS reviewType, raw, proposed, reason FROM local_review_items WHERE week_id = ? ORDER BY id").all(row.id) as ReviewRow[];
   return { id: row.id, weekStarting: row.week_starting, status: row.status, documents, photoAssignments, employees, shifts, rosterEstimates, rosterAssignments, payroll, reviewItems };
@@ -420,6 +435,7 @@ export function writeLocalWeeks(weeks: LocalWeek[]) {
     const existing = database.prepare("SELECT id FROM local_weeks").all() as Array<{ id: string }>;
     for (const row of existing) if (!weeks.some((week) => week.id === row.id)) deleteWeek(database, row.id);
     for (const week of weeks) writeWeek(database, company, week);
+    queueVerifiedSnapshot(database);
   });
   replace();
 }
@@ -427,7 +443,10 @@ export function writeLocalWeeks(weeks: LocalWeek[]) {
 export function writeLocalWeek(week: LocalWeek) {
   const database = openDatabase();
   const company = companyId(database);
-  database.transaction(() => writeWeek(database, company, week))();
+  database.transaction(() => {
+    writeWeek(database, company, week);
+    queueVerifiedSnapshot(database);
+  })();
 }
 
 export function createLocalEmployee(displayName: string, aliases: string[]) {
@@ -451,4 +470,36 @@ export function getLocalSettingsValue() {
     const row = database.prepare("SELECT value_json FROM profile_settings WHERE key = 'settings'").get() as { value_json: string } | undefined;
     return row ? JSON.parse(row.value_json) as unknown : {};
   }) ?? {};
+}
+
+export type LocalSyncState = {
+  revision: number; payload_json: string; acknowledged_revision: number;
+  acknowledged_target: string | null; last_synced_at: string | null; last_error: string | null;
+};
+
+function queueVerifiedSnapshot(database: Database.Database) {
+  // Full replacement snapshots coalesce offline edits and encode deletions without
+  // ever keeping document data in the outbound queue. This runs in the edit transaction.
+  const rows = database.prepare("SELECT id, week_starting, status FROM local_weeks ORDER BY id").all() as WeekRow[];
+  const payload = JSON.stringify(projectVerifiedData(rows.map(row => readWeek(database, row))));
+  const hash = createHash("sha256").update(payload).digest("hex");
+  database.prepare(`INSERT INTO verified_sync_outbox (id, revision, payload_json, payload_hash)
+    VALUES (1, 1, ?, ?) ON CONFLICT(id) DO UPDATE SET
+    revision = revision + 1, payload_json = excluded.payload_json, payload_hash = excluded.payload_hash,
+    last_error = NULL WHERE payload_hash != excluded.payload_hash`).run(payload, hash);
+}
+
+export function prepareLocalSync(): LocalSyncState | null {
+  return withDatabase(database => database.transaction(() => {
+    queueVerifiedSnapshot(database); // Initial catch-up, including migrated profiles/restores.
+    return database.prepare("SELECT * FROM verified_sync_outbox WHERE id = 1").get() as LocalSyncState;
+  })());
+}
+
+export function recordLocalSyncResult(revision: number, target: string, error: string | null) {
+  withDatabase(database => {
+    if (error) database.prepare("UPDATE verified_sync_outbox SET last_error = ? WHERE id = 1 AND revision = ?").run(error, revision);
+    else database.prepare(`UPDATE verified_sync_outbox SET acknowledged_revision = ?, acknowledged_target = ?, last_synced_at = ?, last_error = NULL
+      WHERE id = 1 AND acknowledged_revision <= ?`).run(revision, target, new Date().toISOString(), revision);
+  });
 }
